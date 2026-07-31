@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum SubscriberStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  BLOCKED
+}
+
+enum BroadcastStatus {
+  DRAFT
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIALLY_FAILED
+  CANCELLED
+}
+
+enum MessageStatus {
+  QUEUED
+  PROCESSING
+  SUBMITTED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+}
+
+model Admin {
+  id           Int         @id @default(autoincrement())
+  name         String
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  broadcasts   Broadcast[]
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Subscriber {
+  id             Int              @id @default(autoincrement())
+  name           String?
+  phoneNumber    String           @unique @map("phone_number")
+  optedIn        Boolean          @default(true) @map("opted_in")
+  status         SubscriberStatus @default(ACTIVE)
+  optedInAt      DateTime?        @map("opted_in_at")
+  unsubscribedAt DateTime?        @map("unsubscribed_at")
+  messages       Message[]
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, optedIn])
+  @@map("subscribers")
+}
+
+model Broadcast {
+  id                Int             @id @default(autoincrement())
+  title             String
+  message           String          @db.Text
+  templateName      String?         @map("template_name")
+  status            BroadcastStatus @default(DRAFT)
+  totalRecipients   Int             @default(0) @map("total_recipients")
+  createdById       Int             @map("created_by_id")
+  createdBy         Admin           @relation(fields: [createdById], references: [id])
+  messages          Message[]
+  startedAt         DateTime?       @map("started_at")
+  completedAt       DateTime?       @map("completed_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("broadcasts")
+}
+
+model Message {
+  id                  Int           @id @default(autoincrement())
+  broadcastId         Int           @map("broadcast_id")
+  subscriberId        Int           @map("subscriber_id")
+  phoneNumber         String        @map("phone_number")
+  whatsappMessageId   String?       @unique @map("whatsapp_message_id")
+  status              MessageStatus @default(QUEUED)
+  errorCode           String?       @map("error_code")
+  errorMessage        String?       @db.Text @map("error_message")
+  retryCount          Int           @default(0) @map("retry_count")
+  submittedAt         DateTime?     @map("submitted_at")
+  sentAt              DateTime?     @map("sent_at")
+  deliveredAt         DateTime?     @map("delivered_at")
+  readAt              DateTime?     @map("read_at")
+  failedAt            DateTime?     @map("failed_at")
+  broadcast           Broadcast     @relation(fields: [broadcastId], references: [id])
+  subscriber          Subscriber    @relation(fields: [subscriberId], references: [id])
+  statusEvents        MessageStatusEvent[]
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([broadcastId, status])
+  @@map("messages")
+}
+
+model MessageStatusEvent {
+  id             Int           @id @default(autoincrement())
+  messageId      Int           @map("message_id")
+  status         MessageStatus
+  eventTimestamp DateTime      @map("event_timestamp")
+  webhookPayload Json?         @map("webhook_payload")
+  message        Message       @relation(fields: [messageId], references: [id])
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([messageId, eventTimestamp])
+  @@map("message_status_events")
+}
