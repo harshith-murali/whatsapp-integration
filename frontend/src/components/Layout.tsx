@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../hooks/useTheme.js";
 import { hasPermission } from "../utils/permissions.js";
 import type { Permission } from "../utils/permissions.js";
+import { AnimatedBackground } from "./core/animated-background.js";
+import { Button } from "./ui/button.js";
 import {
   LayoutDashboard,
   Users,
@@ -18,6 +20,11 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  AlertCircle,
+  CheckCircle2,
+  Inbox,
+  User,
+  FileText,
 } from "lucide-react";
 
 // Custom Megaphone/Broadcast icon
@@ -46,6 +53,37 @@ const ROLE_LABELS: Record<string, string> = {
   VIEWER: "Viewer",
 };
 
+const PAGE_META: Record<string, { title: string; subtitle: string }> = {
+  "/": {
+    title: "Dashboard",
+    subtitle: "Live overview of subscribers, broadcasts, and delivery progress.",
+  },
+  "/subscribers": {
+    title: "Subscribers",
+    subtitle: "Manage WhatsApp contacts, consent state, and subscriber records.",
+  },
+  "/groups": {
+    title: "Groups",
+    subtitle: "Organize subscribers into targeted broadcast audiences.",
+  },
+  "/broadcasts": {
+    title: "Broadcasts",
+    subtitle: "Create, approve, queue, and monitor WhatsApp broadcasts.",
+  },
+  "/messages": {
+    title: "Messages",
+    subtitle: "Review provider status, failures, retries, and delivery logs.",
+  },
+  "/admins": {
+    title: "Admin Management",
+    subtitle: "Manage admin accounts, roles, and access.",
+  },
+  "/settings": {
+    title: "System Settings",
+    subtitle: "Review integration status and operational configuration.",
+  },
+};
+
 interface MenuItem {
   name: string;
   path: string;
@@ -58,7 +96,26 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<"notifications" | "chat" | "profile" | null>(null);
   const { isDark, toggleTheme } = useTheme();
+  const currentMeta =
+    PAGE_META[location.pathname] ||
+    (location.pathname.startsWith("/broadcasts/")
+      ? {
+          title: "Broadcast Details",
+          subtitle: "Inspect recipients, message progress, and delivery state.",
+        }
+      : {
+          title: "Workspace",
+          subtitle: "Manage your WhatsApp alert operations.",
+        });
+
+  const closeMenus = () => setOpenMenu(null);
+
+  const goTo = (path: string) => {
+    closeMenus();
+    navigate(path);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -137,37 +194,44 @@ export const Layout: React.FC = () => {
               Menu
             </span>
             <nav className="space-y-1">
-              {filteredItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-150 ${
-                      isActive
-                        ? "bg-tail-sidebar-active text-white"
-                        : "text-tail-sidebar-text hover:text-white hover:bg-tail-sidebar-active/60"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 mr-3 shrink-0" />
-                    {item.name}
-                  </Link>
-                );
-              })}
+              <AnimatedBackground
+                defaultValue={filteredItems.find((item) => item.path === location.pathname)?.name}
+                className="rounded-lg bg-tail-sidebar-active/70"
+                enableHover
+              >
+                {filteredItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.name}
+                      data-id={item.name}
+                      to={item.path}
+                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                        isActive
+                          ? "bg-tail-sidebar-active text-white"
+                          : "text-tail-sidebar-text hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 mr-3 shrink-0" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </AnimatedBackground>
             </nav>
           </div>
         </div>
 
         {/* Logout area */}
         <div className="p-4 border-t border-tail-sidebar-active">
-          <button
+          <Button
             onClick={handleLogout}
             className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer animate-none"
           >
             <LogOut className="h-5 w-5 mr-3 shrink-0" />
             Sign Out
-          </button>
+          </Button>
         </div>
       </aside>
 
@@ -184,45 +248,52 @@ export const Layout: React.FC = () => {
                   TailAdmin
                 </span>
               </div>
-              <button
+              <Button
                 onClick={() => setMobileMenuOpen(false)}
                 className="rounded-lg p-1.5 text-tail-sidebar-text hover:text-white hover:bg-tail-sidebar-active"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
             <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
               <span className="block text-xs font-semibold text-tail-sidebar-text uppercase tracking-widest px-4 mb-3">
                 Menu
               </span>
-              {filteredItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                      isActive
-                        ? "bg-tail-sidebar-active text-white"
-                        : "text-tail-sidebar-text hover:text-white hover:bg-tail-sidebar-active/60"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 mr-3 shrink-0" />
-                    {item.name}
-                  </Link>
-                );
-              })}
+              <AnimatedBackground
+                defaultValue={filteredItems.find((item) => item.path === location.pathname)?.name}
+                className="rounded-lg bg-tail-sidebar-active/70"
+                enableHover
+              >
+                {filteredItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.name}
+                      data-id={item.name}
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                        isActive
+                          ? "bg-tail-sidebar-active text-white"
+                          : "text-tail-sidebar-text hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 mr-3 shrink-0" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </AnimatedBackground>
             </nav>
             <div className="p-4 border-t border-tail-sidebar-active">
-              <button
+              <Button
                 onClick={handleLogout}
                 className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg"
               >
                 <LogOut className="h-5 w-5 mr-3" />
                 Sign Out
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -231,48 +302,153 @@ export const Layout: React.FC = () => {
       {/* Main Content Pane */}
       <div className="flex flex-1 flex-col overflow-hidden w-full">
         {/* Header */}
-        <header className="flex h-20 items-center justify-between px-6 lg:px-8 bg-white dark:bg-tail-dark-card border-b border-tail-border dark:border-tail-dark-border shrink-0">
-          <div className="flex items-center flex-1">
-            <button
+        <header className="flex h-20 items-center justify-between gap-4 px-6 lg:px-8 bg-white dark:bg-tail-dark-card border-b border-tail-border dark:border-tail-dark-border shrink-0">
+          <div className="flex min-w-0 flex-1 items-center">
+            <Button
               onClick={() => setMobileMenuOpen(true)}
               className="md:hidden p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg mr-4"
             >
               <Menu className="h-6 w-6" />
-            </button>
+            </Button>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {currentMeta.title}
+              </h1>
+              <p className="mt-1 hidden max-w-2xl truncate text-sm text-slate-500 dark:text-slate-400 lg:block">
+                {currentMeta.subtitle}
+              </p>
+            </div>
           </div>
 
           {/* Right Header widgets */}
-          <div className="flex items-center space-x-6">
+          <div className="relative flex items-center space-x-4 lg:space-x-5">
             {/* Theme Toggle button */}
-            <button
+            <Button
               onClick={toggleTheme}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
               title={isDark ? "Switch to light mode" : "Switch to dark mode"}
               aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
+            </Button>
 
-            {/* Notification Bell (no badge — not yet implemented) */}
-            <button
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              title="Notifications module is planned for a later phase"
+            {/* Notification Bell */}
+            <div className="relative">
+              <Button
+              onClick={() =>
+                setOpenMenu(openMenu === "notifications" ? null : "notifications")
+              }
+              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              title="Notifications"
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
-            </button>
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-tail-dark-card" />
+              </Button>
+              {openMenu === "notifications" && (
+                <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
+                  <div className="border-b border-tail-border px-4 py-3 dark:border-tail-dark-border">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      Notifications
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Operational shortcuts from real app sections.
+                    </p>
+                  </div>
+                  <div className="p-2">
+                    <Button
+                      onClick={() => goTo("/broadcasts")}
+                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          Review broadcasts
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                          Open drafts, approvals, queued, and failed broadcasts.
+                        </span>
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={() => goTo("/messages")}
+                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <FileText className="mt-0.5 h-4 w-4 text-rose-500" />
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          Check failed messages
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                          Inspect retries, provider errors, and delivery status.
+                        </span>
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={() => goTo("/settings")}
+                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          Integration status
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                          Review Meta configuration and system readiness.
+                        </span>
+                      </span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Messages icon (no badge — not yet implemented) */}
-            <button
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              title="Messages chat module is planned for a later phase"
+            {/* Messages icon */}
+            <div className="relative">
+              <Button
+              onClick={() => setOpenMenu(openMenu === "chat" ? null : "chat")}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              title="Messages"
               aria-label="Messages"
             >
               <MessageSquare className="h-5 w-5" />
-            </button>
+              </Button>
+              {openMenu === "chat" && (
+                <div className="absolute right-0 top-12 z-40 w-72 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
+                  <div className="border-b border-tail-border px-4 py-3 dark:border-tail-dark-border">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      Message Center
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Jump into messaging workflows.
+                    </p>
+                  </div>
+                  <div className="p-2">
+                    <Button
+                      onClick={() => goTo("/messages")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <MessageSquare className="h-4 w-4 text-indigo-500" />
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        Open message logs
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={() => goTo("/subscribers?add=true")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <Inbox className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        Add subscriber
+                      </span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* User Profile */}
-            <div className="flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-800">
+            <div className="relative flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-800">
               <div className="text-right hidden lg:block">
                 <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
                   {admin?.name}
@@ -281,12 +457,58 @@ export const Layout: React.FC = () => {
                   {admin ? ROLE_LABELS[admin.role] : ""}
                 </p>
               </div>
-              <div className="flex items-center space-x-1.5 cursor-pointer group">
+              <Button
+                onClick={() => setOpenMenu(openMenu === "profile" ? null : "profile")}
+                className="flex items-center space-x-1.5 cursor-pointer group"
+                aria-label="Profile menu"
+              >
                 <div className="h-10 w-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-inner uppercase">
                   {admin?.name.substring(0, 2)}
                 </div>
                 <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-white" />
-              </div>
+              </Button>
+              {openMenu === "profile" && (
+                <div className="absolute right-0 top-14 z-40 w-64 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
+                  <div className="border-b border-tail-border px-4 py-4 dark:border-tail-dark-border">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      {admin?.name}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      {admin?.email}
+                    </p>
+                    <span className="mt-2 inline-flex rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
+                      {admin ? ROLE_LABELS[admin.role] : ""}
+                    </span>
+                  </div>
+                  <div className="p-2">
+                    <Button
+                      onClick={() => goTo("/settings")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <SettingsIcon className="h-4 w-4 text-slate-500" />
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        Settings
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={() => goTo("/admins")}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <User className="h-4 w-4 text-slate-500" />
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        Admin management
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={handleLogout}
+                      className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Sign out</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

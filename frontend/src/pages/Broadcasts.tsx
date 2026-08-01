@@ -4,6 +4,9 @@ import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
 import { hasPermission } from "../utils/permissions.js";
 import { BroadcastForm } from "../components/BroadcastForm.js";
+import { SelectMenu } from "../components/ui/select-menu.js";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert.js";
+import { Button } from "../components/ui/button.js";
 import {
   Megaphone,
   Plus,
@@ -19,6 +22,9 @@ import {
   Play,
   StopCircle,
   X,
+  CheckCircle2Icon,
+  InfoIcon,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Broadcast {
@@ -37,6 +43,15 @@ interface Broadcast {
   createdAt: string;
   createdBy: { name: string };
   group: { name: string } | null;
+}
+
+interface ConfirmationState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "info" | "success" | "danger";
+  icon: React.ComponentType<{ className?: string }>;
+  onConfirm: () => Promise<void>;
 }
 
 export const Broadcasts: React.FC = () => {
@@ -69,12 +84,23 @@ export const Broadcasts: React.FC = () => {
   const [previewData, setPreviewData] = useState<any | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [confirmQueueChecked, setConfirmQueueChecked] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
 
   // RBAC Checks
   const canCreate = hasPermission(admin?.role, "broadcasts.create");
   const canApprove = hasPermission(admin?.role, "broadcasts.approve");
   const canQueue = hasPermission(admin?.role, "broadcasts.queue");
   const canCancel = hasPermission(admin?.role, "broadcasts.cancel");
+  const statusFilterOptions = [
+    { value: "", label: "All Statuses" },
+    { value: "DRAFT", label: "DRAFT" },
+    { value: "PENDING_APPROVAL", label: "PENDING APPROVAL" },
+    { value: "APPROVED", label: "APPROVED" },
+    { value: "REJECTED", label: "REJECTED" },
+    { value: "QUEUED", label: "QUEUED" },
+    { value: "CANCELLED", label: "CANCELLED" },
+  ];
 
   const fetchBroadcasts = async () => {
     try {
@@ -140,30 +166,46 @@ export const Broadcasts: React.FC = () => {
 
   // Lifecycle workflow actions
   const handleSubmitForApproval = async (id: number) => {
-    if (!window.confirm("Submit this campaign draft for approval?")) return;
-    try {
-      setSubmittingId(id);
-      const response = await api.post(`/broadcasts/${id}/submit`);
-      if (response.data?.success) {
-        fetchBroadcasts();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Submission failed");
-    } finally {
-      setSubmittingId(null);
-    }
+    setConfirmation({
+      title: "Submit Campaign",
+      description: "Submit this campaign draft for approval. Reviewers will be able to approve or reject it.",
+      confirmLabel: "Submit",
+      tone: "info",
+      icon: InfoIcon,
+      onConfirm: async () => {
+        try {
+          setSubmittingId(id);
+          const response = await api.post(`/broadcasts/${id}/submit`);
+          if (response.data?.success) {
+            fetchBroadcasts();
+          }
+        } catch (err: any) {
+          alert(err.response?.data?.message || "Submission failed");
+        } finally {
+          setSubmittingId(null);
+        }
+      },
+    });
   };
 
   const handleApprove = async (id: number) => {
-    if (!window.confirm("Approve this broadcast? It will be ready to queue immediately.")) return;
-    try {
-      const response = await api.post(`/broadcasts/${id}/approve`);
-      if (response.data?.success) {
-        fetchBroadcasts();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Approval failed");
-    }
+    setConfirmation({
+      title: "Approve Broadcast",
+      description: "Approve this broadcast. It will be ready to queue immediately after approval.",
+      confirmLabel: "Approve",
+      tone: "success",
+      icon: CheckCircle2Icon,
+      onConfirm: async () => {
+        try {
+          const response = await api.post(`/broadcasts/${id}/approve`);
+          if (response.data?.success) {
+            fetchBroadcasts();
+          }
+        } catch (err: any) {
+          alert(err.response?.data?.message || "Approval failed");
+        }
+      },
+    });
   };
 
   const openRejectModal = (bc: Broadcast) => {
@@ -219,6 +261,7 @@ export const Broadcasts: React.FC = () => {
   const openRecipientPreview = async (bc: Broadcast) => {
     setSelectedBroadcast(bc);
     setConfirmQueueChecked(false);
+    setQueueError(null);
     setPreviewModalOpen(true);
     setPreviewData(null);
     try {
@@ -236,6 +279,7 @@ export const Broadcasts: React.FC = () => {
 
   const handleQueueBroadcast = async () => {
     if (!selectedBroadcast || !confirmQueueChecked) return;
+    setQueueError(null);
     try {
       setActionLoading(true);
       const response = await api.post(`/broadcasts/${selectedBroadcast.id}/queue`);
@@ -244,21 +288,40 @@ export const Broadcasts: React.FC = () => {
         fetchBroadcasts();
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to queue messages");
+      setQueueError(err.response?.data?.message || "Failed to queue messages");
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteBroadcast = async (id: number) => {
-    if (!window.confirm("Permanently delete this campaign draft? This cannot be undone.")) return;
+    setConfirmation({
+      title: "Delete Campaign Draft",
+      description: "Permanently delete this campaign draft. This action cannot be undone.",
+      confirmLabel: "Delete",
+      tone: "danger",
+      icon: AlertTriangle,
+      onConfirm: async () => {
+        try {
+          const response = await api.delete(`/broadcasts/${id}`);
+          if (response.data?.success) {
+            fetchBroadcasts();
+          }
+        } catch (err: any) {
+          alert(err.response?.data?.message || "Delete failed");
+        }
+      },
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmation) return;
     try {
-      const response = await api.delete(`/broadcasts/${id}`);
-      if (response.data?.success) {
-        fetchBroadcasts();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Delete failed");
+      setActionLoading(true);
+      await confirmation.onConfirm();
+      setConfirmation(null);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -293,12 +356,12 @@ export const Broadcasts: React.FC = () => {
             </h2>
             <p className="text-sm text-slate-500 mt-1">Configure your message templates and audience targets.</p>
           </div>
-          <button
+          <Button
             onClick={() => setActiveFormMode("list")}
-            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-sm text-slate-700 dark:border-tail-dark-border dark:text-slate-300 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+            variant="outline"
           >
             Cancel Draft
-          </button>
+          </Button>
         </div>
         <BroadcastForm onSubmit={handleFormSubmit} loading={actionLoading} />
       </div>
@@ -315,15 +378,15 @@ export const Broadcasts: React.FC = () => {
             </h2>
             <p className="text-sm text-slate-500 mt-1">Update parameters for draft ID: {editingBroadcast.id}</p>
           </div>
-          <button
+          <Button
             onClick={() => {
               setActiveFormMode("list");
               setEditingBroadcast(null);
             }}
-            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-sm text-slate-700 dark:border-tail-dark-border dark:text-slate-300 dark:hover:bg-slate-800 font-semibold cursor-pointer"
+            variant="outline"
           >
             Back to List
-          </button>
+          </Button>
         </div>
 
         {editingBroadcast.status === "REJECTED" && (
@@ -349,6 +412,26 @@ export const Broadcasts: React.FC = () => {
     );
   }
 
+  const ConfirmationIcon = confirmation?.icon;
+  const confirmationToneClass =
+    confirmation?.tone === "danger"
+      ? "border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100"
+      : confirmation?.tone === "success"
+        ? "border-emerald-200 bg-emerald-50/80 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100"
+        : "border-indigo-200 bg-indigo-50/80 text-indigo-950 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-indigo-100";
+  const confirmationIconClass =
+    confirmation?.tone === "danger"
+      ? "text-rose-600 dark:text-rose-400"
+      : confirmation?.tone === "success"
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-indigo-600 dark:text-indigo-400";
+  const confirmationButtonClass =
+    confirmation?.tone === "danger"
+      ? "bg-rose-600 hover:bg-rose-700"
+      : confirmation?.tone === "success"
+        ? "bg-emerald-600 hover:bg-emerald-700"
+        : "bg-indigo-600 hover:bg-indigo-700";
+
   return (
     <>
       <div className="space-y-6 animate-fade-in">
@@ -363,13 +446,12 @@ export const Broadcasts: React.FC = () => {
             </p>
           </div>
           {canCreate && (
-            <button
+            <Button
               onClick={() => setActiveFormMode("create")}
-              className="inline-flex items-center justify-center px-4.5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm shadow-md hover:bg-indigo-700 transition-colors cursor-pointer"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Campaign
-            </button>
+            </Button>
           )}
         </div>
 
@@ -389,29 +471,22 @@ export const Broadcasts: React.FC = () => {
               />
             </div>
             <div>
-              <select
+              <SelectMenu
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                options={statusFilterOptions}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
                   setPage(1);
                 }}
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
-              >
-                <option value="">All Statuses</option>
-                <option value="DRAFT">DRAFT</option>
-                <option value="PENDING_APPROVAL">PENDING APPROVAL</option>
-                <option value="APPROVED">APPROVED</option>
-                <option value="REJECTED">REJECTED</option>
-                <option value="QUEUED">QUEUED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
+                label="Status"
+              />
             </div>
-            <button
+            <Button
               type="submit"
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg transition-colors cursor-pointer"
             >
               Search
-            </button>
+            </Button>
           </form>
         </div>
 
@@ -500,77 +575,77 @@ export const Broadcasts: React.FC = () => {
                           {/* DRAFT actions */}
                           {bc.status === "DRAFT" && (
                             <>
-                              <button
+                              <Button
                                 onClick={() => setActiveFormMode("edit")}
                                 className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-650 dark:hover:bg-slate-800"
                                 title="Edit Draft"
                                 onClickCapture={() => setEditingBroadcast(bc)}
                               >
                                 <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 disabled={submittingId === bc.id}
                                 onClick={() => handleSubmitForApproval(bc.id)}
                                 className="p-1 hover:bg-indigo-50 rounded text-indigo-600 hover:text-indigo-750 dark:hover:bg-indigo-950/20"
                                 title="Submit for Approval"
                               >
                                 <Send className="h-4 w-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 onClick={() => handleDeleteBroadcast(bc.id)}
                                 className="p-1 hover:bg-red-50 rounded text-slate-500 hover:text-red-650 dark:hover:bg-red-950/20"
                                 title="Delete Draft"
                               >
                                 <Trash2 className="h-4 w-4" />
-                              </button>
+                              </Button>
                             </>
                           )}
 
                           {/* PENDING APPROVAL review action options */}
                           {bc.status === "PENDING_APPROVAL" && canApprove && (
                             <>
-                              <button
+                              <Button
                                 onClick={() => handleApprove(bc.id)}
                                 className="p-1 hover:bg-emerald-50 rounded text-emerald-600 hover:text-emerald-750 dark:hover:bg-emerald-950/20"
                                 title="Approve Broadcast"
                               >
                                 <CheckCircle className="h-4 w-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 onClick={() => openRejectModal(bc)}
                                 className="p-1 hover:bg-rose-50 rounded text-rose-600 hover:text-rose-700 dark:hover:bg-rose-950/20"
                                 title="Reject Broadcast"
                               >
                                 <XCircle className="h-4 w-4" />
-                              </button>
+                              </Button>
                             </>
                           )}
 
                           {/* APPROVED queuing actions */}
                           {bc.status === "APPROVED" && (
                             <>
-                              <button
+                              <Button
                                 onClick={() => openRecipientPreview(bc)}
                                 className="p-1.5 bg-indigo-50 hover:bg-indigo-150 rounded text-indigo-700 text-xs font-semibold flex items-center dark:bg-indigo-950/20 dark:text-indigo-400"
                                 title="Preview and Queue"
                               >
                                 <Play className="h-3.5 w-3.5 mr-1" /> Queue
-                              </button>
+                              </Button>
                               {canCancel && (
-                                <button
+                                <Button
                                   onClick={() => openCancelModal(bc)}
                                   className="p-1 hover:bg-red-50 rounded text-red-600 hover:text-red-750 dark:hover:bg-red-950/20"
                                   title="Cancel Broadcast"
                                 >
                                   <StopCircle className="h-4 w-4" />
-                                </button>
+                                </Button>
                               )}
                             </>
                           )}
 
                           {/* REJECTED edit action */}
                           {bc.status === "REJECTED" && (
-                            <button
+                            <Button
                               onClick={() => {
                                 setEditingBroadcast(bc);
                                 setActiveFormMode("edit");
@@ -579,18 +654,18 @@ export const Broadcasts: React.FC = () => {
                               title="Modify and Resubmit"
                             >
                               <Edit2 className="h-3.5 w-3.5 mr-1" /> Resubmit
-                            </button>
+                            </Button>
                           )}
 
                           {/* QUEUED cancellation action */}
                           {bc.status === "QUEUED" && canCancel && (
-                            <button
+                            <Button
                               onClick={() => openCancelModal(bc)}
                               className="p-1.5 bg-red-50 hover:bg-red-100 rounded text-red-700 text-xs font-semibold flex items-center dark:bg-red-950/20 dark:text-red-400"
                               title="Cancel Queueing"
                             >
                               <StopCircle className="h-3.5 w-3.5 mr-1" /> Cancel
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -607,26 +682,60 @@ export const Broadcasts: React.FC = () => {
                   Page {page} of {totalPages} ({total} campaigns)
                 </span>
                 <div className="flex space-x-2">
-                  <button
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                    className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <button
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                    className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                          <Button
+                            disabled={page <= 1}
+                            onClick={() => setPage(page - 1)}
+                            variant="outline"
+                            size="icon"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            disabled={page >= totalPages}
+                            onClick={() => setPage(page + 1)}
+                            variant="outline"
+                            size="icon"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {confirmation && ConfirmationIcon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg animate-zoom-in rounded-lg border border-tail-border bg-white p-4 shadow-2xl shadow-slate-900/20 dark:border-tail-dark-border dark:bg-tail-dark-card">
+            <Alert className={confirmationToneClass}>
+              <ConfirmationIcon className={`mt-0.5 h-5 w-5 ${confirmationIconClass}`} />
+              <div>
+                <AlertTitle>{confirmation.title}</AlertTitle>
+                <AlertDescription>{confirmation.description}</AlertDescription>
+              </div>
+            </Alert>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmation(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-tail-dark-border dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleConfirmAction}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-colors disabled:opacity-50 ${confirmationButtonClass}`}
+              >
+                {actionLoading ? "Working..." : confirmation.confirmLabel}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REJECT MODAL */}
       {rejectModalOpen && selectedBroadcast && (
@@ -636,12 +745,12 @@ export const Broadcasts: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Reject Broadcast draft
               </h3>
-              <button
+              <Button
                 onClick={() => setRejectModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleRejectSubmit}>
@@ -662,20 +771,20 @@ export const Broadcasts: React.FC = () => {
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setRejectModalOpen(false)}
-                  className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
+                  variant="ghost"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2.5 rounded-lg bg-red-650 hover:bg-red-700 text-white text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
+                  variant="destructive"
                 >
                   Reject draft
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -690,12 +799,12 @@ export const Broadcasts: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Cancel Active Campaign?
               </h3>
-              <button
+              <Button
                 onClick={() => setCancelModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleCancelSubmit}>
@@ -716,20 +825,20 @@ export const Broadcasts: React.FC = () => {
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setCancelModalOpen(false)}
-                  className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
+                  variant="ghost"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
+                  variant="destructive"
                 >
                   Cancel Campaign
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -749,15 +858,26 @@ export const Broadcasts: React.FC = () => {
                   Campaign: {selectedBroadcast.title}
                 </p>
               </div>
-              <button
+              <Button
                 onClick={() => setPreviewModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
+              {queueError && (
+                <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  <div>
+                    <AlertTitle>Queue failed</AlertTitle>
+                    <AlertDescription className="text-rose-700 dark:text-rose-300">
+                      {queueError}
+                    </AlertDescription>
+                  </div>
+                </Alert>
+              )}
               {previewLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 space-y-3">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
@@ -852,22 +972,22 @@ export const Broadcasts: React.FC = () => {
             </div>
 
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setPreviewModalOpen(false)}
-                className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
+                variant="ghost"
               >
                 Cancel
-              </button>
+              </Button>
               {previewData && previewData.eligibleRecipients > 0 && canQueue && (
-                <button
+                <Button
                   type="button"
                   disabled={!confirmQueueChecked || actionLoading}
                   onClick={handleQueueBroadcast}
-                  className="px-4 py-2.5 rounded-lg bg-indigo-650 hover:bg-indigo-750 text-white text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
+                  variant="default"
                 >
                   {actionLoading ? "Queueing..." : "Queue Broadcast"}
-                </button>
+                </Button>
               )}
             </div>
           </div>

@@ -21,7 +21,7 @@ import {
   MessageStatus,
   MessageTemplateStatus,
 } from "../generated/prisma/client.js";
-import { getMessageProviderMode } from "../config/env.js";
+import { getMetaConfig, getMessageProviderMode } from "../config/env.js";
 
 /** Helper to mask subscriber phone numbers in previews */
 const maskPhone = (phone: string): string => {
@@ -742,9 +742,33 @@ export const queueBroadcast = async (
         throw new ConflictError("Only APPROVED broadcasts can be queued");
       }
 
+      const metaConfig = getMetaConfig();
+      let effectiveTemplate = broadcast.messageTemplate;
+
+      if (!effectiveTemplate && getMessageProviderMode() === "meta") {
+        effectiveTemplate = await tx.messageTemplate.findFirst({
+          where: {
+            name: metaConfig.defaultTemplateName,
+            language: metaConfig.defaultTemplateLanguage,
+            status: MessageTemplateStatus.APPROVED,
+          },
+        });
+      }
+
       if (getMessageProviderMode() === "meta") {
-        if (!broadcast.messageTemplate || broadcast.messageTemplate.status !== MessageTemplateStatus.APPROVED) {
-          throw new ConflictError("Meta broadcasts require a synced APPROVED WhatsApp template before queueing");
+        if (!effectiveTemplate || effectiveTemplate.status !== MessageTemplateStatus.APPROVED) {
+          const availableTemplates = await tx.messageTemplate.findMany({
+            where: { status: MessageTemplateStatus.APPROVED },
+            select: { name: true, language: true },
+            orderBy: [{ name: "asc" }, { language: "asc" }],
+            take: 10,
+          });
+          const available = availableTemplates
+            .map((template) => `${template.name}/${template.language}`)
+            .join(", ");
+          throw new ConflictError(
+            `No synced APPROVED WhatsApp template found for ${metaConfig.defaultTemplateName}/${metaConfig.defaultTemplateLanguage}. Available approved templates: ${available || "none"}. Run templates:sync after Meta approves the template.`
+          );
         }
       }
 
@@ -798,6 +822,9 @@ export const queueBroadcast = async (
         skipDuplicates: true, // Safety guard for unique constraints
       });
 
+      const resolvedTemplateName = effectiveTemplate?.name || broadcast.templateName || metaConfig.defaultTemplateName || null;
+      const resolvedTemplateLanguage = effectiveTemplate?.language || broadcast.templateLanguage || metaConfig.defaultTemplateLanguage || null;
+
       // 4. Update Broadcast properties
       const updatedBroadcast = await tx.broadcast.update({
         where: { id },
@@ -805,18 +832,18 @@ export const queueBroadcast = async (
           status: BroadcastStatus.QUEUED,
           totalRecipients: recipientCount,
           queuedAt: new Date(),
-          templateName: broadcast.messageTemplate?.name || broadcast.templateName,
-          templateLanguage: broadcast.messageTemplate?.language || broadcast.templateLanguage,
-          templateSnapshot: broadcast.messageTemplate
+          templateName: resolvedTemplateName,
+          templateLanguage: resolvedTemplateLanguage,
+          templateSnapshot: effectiveTemplate
             ? {
-                id: broadcast.messageTemplate.id,
-                metaTemplateId: broadcast.messageTemplate.metaTemplateId,
-                name: broadcast.messageTemplate.name,
-                language: broadcast.messageTemplate.language,
-                category: broadcast.messageTemplate.category,
-                status: broadcast.messageTemplate.status,
-                components: broadcast.messageTemplate.components,
-                parameterSchema: broadcast.messageTemplate.parameterSchema,
+                id: effectiveTemplate.id,
+                metaTemplateId: effectiveTemplate.metaTemplateId,
+                name: effectiveTemplate.name,
+                language: effectiveTemplate.language,
+                category: effectiveTemplate.category,
+                status: effectiveTemplate.status,
+                components: effectiveTemplate.components,
+                parameterSchema: effectiveTemplate.parameterSchema,
               }
             : (broadcast.templateSnapshot === null ? undefined : broadcast.templateSnapshot as any),
         },

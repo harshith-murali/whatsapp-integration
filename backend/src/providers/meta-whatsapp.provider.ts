@@ -133,6 +133,21 @@ export class MetaWhatsAppProvider implements MessageProvider {
       return snapshot;
     }
 
+    const broadcastTemplateName = input.metadata?.templateName;
+    const broadcastTemplateLanguage = input.metadata?.templateLanguage;
+    if (
+      typeof broadcastTemplateName === "string" &&
+      broadcastTemplateName.trim() &&
+      typeof broadcastTemplateLanguage === "string" &&
+      broadcastTemplateLanguage.trim()
+    ) {
+      return {
+        name: broadcastTemplateName.trim(),
+        language: broadcastTemplateLanguage.trim(),
+        parameterSchema: null,
+      };
+    }
+
     const templateName = this.config.defaultTemplateName;
     if (!templateName) {
       throw new Error("Broadcast has no template snapshot and WHATSAPP_DEFAULT_TEMPLATE_NAME is not configured");

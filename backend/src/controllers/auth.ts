@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { loginSchema } from "../validators/auth.js";
 import { BadRequestError, UnauthorizedError } from "../utils/errors.js";
+import { getAppConfig } from "../config/env.js";
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -26,10 +27,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error("JWT_SECRET is not configured");
-    }
+    const appConfig = getAppConfig();
 
     // Generate JWT
     const token = jwt.sign(
@@ -38,16 +36,17 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         email: admin.email,
         role: admin.role,
       },
-      jwtSecret,
-      { expiresIn: "8h" }
+      appConfig.jwtSecret,
+      { expiresIn: `${appConfig.sessionDurationHours}h` }
     );
 
     // Set cookie
     res.cookie("access_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours in ms
+      secure: appConfig.cookieSecure,
+      sameSite: appConfig.cookieSameSite,
+      domain: appConfig.cookieDomain,
+      maxAge: appConfig.sessionDurationHours * 60 * 60 * 1000,
     });
 
     res.status(200).json({
@@ -69,8 +68,9 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
   try {
     res.clearCookie("access_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: getAppConfig().cookieSecure,
+      sameSite: getAppConfig().cookieSameSite,
+      domain: getAppConfig().cookieDomain,
     });
 
     res.status(200).json({

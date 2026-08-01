@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
+import { SelectMenu } from "../components/ui/select-menu.js";
+import { Button } from "../components/ui/button.js";
 import {
   MessageSquare,
   Search,
@@ -62,6 +64,14 @@ export const Messages: React.FC = () => {
   const [actionMessageId, setActionMessageId] = useState<number | null>(null);
 
   const isAdminOrSuper = admin?.role === "ADMIN" || admin?.role === "SUPER_ADMIN";
+  const messageStatusOptions = [
+    { value: "", label: "All Statuses" },
+    { value: "QUEUED", label: "QUEUED" },
+    { value: "PROCESSING", label: "PROCESSING" },
+    { value: "SUBMITTED", label: "SUBMITTED" },
+    { value: "FAILED", label: "FAILED" },
+    { value: "CANCELLED", label: "CANCELLED" },
+  ];
 
   // Fetch broadcasts options for select filter
   useEffect(() => {
@@ -188,13 +198,13 @@ export const Messages: React.FC = () => {
             Track individual WhatsApp delivery logs, event status queues, and failures.
           </p>
         </div>
-        <button
+        <Button
           onClick={() => fetchMessages()}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors dark:border-tail-dark-border dark:bg-tail-dark-card dark:text-white dark:hover:bg-slate-800 cursor-pointer"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Filter workspace */}
@@ -215,39 +225,34 @@ export const Messages: React.FC = () => {
             </div>
 
             <div>
-              <select
+              <SelectMenu
                 value={broadcastFilter}
-                onChange={(e) => {
-                  setBroadcastFilter(e.target.value);
+                options={[
+                  { value: "", label: "All Campaigns" },
+                  ...broadcasts.map((broadcast) => ({
+                    value: String(broadcast.id),
+                    label: broadcast.title,
+                  })),
+                ]}
+                onValueChange={(value) => {
+                  setBroadcastFilter(value);
                   setPage(1);
                 }}
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-750 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
-              >
-                <option value="">All Campaigns</option>
-                {broadcasts.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.title}
-                  </option>
-                ))}
-              </select>
+                label="Campaign"
+                contentClassName="w-72"
+              />
             </div>
 
             <div>
-              <select
+              <SelectMenu
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                options={messageStatusOptions}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
                   setPage(1);
                 }}
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-750 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
-              >
-                <option value="">All Statuses</option>
-                <option value="QUEUED">QUEUED</option>
-                <option value="PROCESSING">PROCESSING</option>
-                <option value="SUBMITTED">SUBMITTED</option>
-                <option value="FAILED">FAILED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
+                label="Status"
+              />
             </div>
           </div>
 
@@ -369,13 +374,13 @@ export const Messages: React.FC = () => {
                     </td>
                     <td className="px-5 py-4 text-right">
                       {isAdminOrSuper && msg.status === "FAILED" && (
-                        <button
+                        <Button
                           disabled={actionMessageId === msg.id}
                           onClick={() => handleRequeue(msg.id)}
                           className="inline-flex items-center justify-center px-2.5 py-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold text-[10px] shadow-2xs transition-colors cursor-pointer disabled:opacity-40"
                         >
                           {actionMessageId === msg.id ? "Queuing..." : "Requeue"}
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -391,20 +396,20 @@ export const Messages: React.FC = () => {
                 Page {page} of {totalPages} ({total} message logs)
               </span>
               <div className="flex space-x-2">
-                <button
+                <Button
                   disabled={page <= 1}
                   onClick={() => setPage(page - 1)}
                   className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
+                </Button>
+                <Button
                   disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
                   className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                 >
                   <ChevronRight className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           )}

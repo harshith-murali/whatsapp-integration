@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 
 // Ensure logs directory exists
-const LOGS_DIR = path.join(process.cwd(), "logs");
+const LOGS_DIR = path.join(process.cwd(), process.env.LOG_DIRECTORY || "logs");
 if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }

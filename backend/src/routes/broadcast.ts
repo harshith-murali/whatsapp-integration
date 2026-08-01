@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import { AdminRole } from "../generated/prisma/client.js";
 import {
   getBroadcasts,
@@ -38,6 +39,7 @@ router.get(
 router.post(
   "/",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.OPERATOR),
+  idempotencyMiddleware,
   createBroadcast
 );
 
@@ -57,6 +59,7 @@ router.delete(
 router.post(
   "/:id/submit",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.OPERATOR),
+  idempotencyMiddleware,
   submitBroadcast
 );
 
@@ -64,6 +67,7 @@ router.post(
 router.post(
   "/:id/approve",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
+  idempotencyMiddleware,
   approveBroadcast
 );
 
@@ -83,12 +87,14 @@ router.get(
 router.post(
   "/:id/queue",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
+  idempotencyMiddleware,
   queueBroadcast
 );
 
 router.post(
   "/:id/cancel",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
+  idempotencyMiddleware,
   cancelBroadcast
 );
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
 import { hasPermission } from "../utils/permissions.js";
+import { Button } from "../components/ui/button.js";
 import {
   Plus,
   Search,
@@ -298,13 +299,13 @@ export const Groups: React.FC = () => {
             </p>
           </div>
           {canCreate && (
-            <button
+            <Button
               onClick={openCreateModal}
               className="inline-flex items-center justify-center px-4.5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm shadow-md hover:bg-indigo-700 transition-colors cursor-pointer"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Group
-            </button>
+            </Button>
           )}
         </div>
 
@@ -327,12 +328,12 @@ export const Groups: React.FC = () => {
                     className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
                   />
                 </div>
-                <button
+                <Button
                   type="submit"
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer"
                 >
                   Search
-                </button>
+                </Button>
               </form>
             </div>
 
@@ -398,22 +399,22 @@ export const Groups: React.FC = () => {
                             <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end space-x-2">
                                 {canUpdate && (
-                                  <button
+                                  <Button
                                     onClick={() => openEditModal(group)}
                                     className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-600 dark:hover:bg-slate-800 dark:text-slate-400"
                                     title="Edit Group"
                                   >
                                     <Edit2 className="h-4 w-4" />
-                                  </button>
+                                  </Button>
                                 )}
                                 {canDelete && (
-                                  <button
+                                  <Button
                                     onClick={() => openDeleteConfirm(group)}
                                     className="p-1 hover:bg-red-50 rounded text-slate-500 hover:text-red-600 dark:hover:bg-red-950/20 dark:text-slate-400"
                                     title="Delete Group"
                                   >
                                     <Trash2 className="h-4 w-4" />
-                                  </button>
+                                  </Button>
                                 )}
                               </div>
                             </td>
@@ -431,20 +432,20 @@ export const Groups: React.FC = () => {
                       Page {page} of {totalPages} ({total} groups)
                     </span>
                     <div className="flex space-x-2">
-                      <button
+                      <Button
                         disabled={page <= 1}
                         onClick={() => setPage(page - 1)}
                         className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
                       >
                         <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         disabled={page >= totalPages}
                         onClick={() => setPage(page + 1)}
                         className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
                       >
                         <ChevronRight className="h-4 w-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -465,12 +466,12 @@ export const Groups: React.FC = () => {
                       {activeGroupView.description || "No description provided"}
                     </p>
                   </div>
-                  <button
+                  <Button
                     onClick={() => setActiveGroupView(null)}
                     className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
                   >
                     <X className="h-5 w-5" />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Member Search list inside details */}
@@ -480,12 +481,12 @@ export const Groups: React.FC = () => {
                       Group Members ({members.length})
                     </span>
                     {canManageMembers && (
-                      <button
+                      <Button
                         onClick={() => setAddSubModalOpen(true)}
                         className="inline-flex items-center text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add Member
-                      </button>
+                      </Button>
                     )}
                   </div>
 
@@ -497,12 +498,12 @@ export const Groups: React.FC = () => {
                       onChange={(e) => setMembersSearch(e.target.value)}
                       className="block flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs focus:outline-hidden focus:bg-white dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
                     />
-                    <button
+                    <Button
                       type="submit"
                       className="px-2.5 py-1.5 bg-indigo-600 text-white rounded text-xs font-semibold cursor-pointer"
                     >
                       Filter
-                    </button>
+                    </Button>
                   </form>
 
                   {membersLoading ? (
@@ -546,13 +547,13 @@ export const Groups: React.FC = () => {
                           </div>
 
                           {canManageMembers && (
-                            <button
+                            <Button
                               onClick={() => handleRemoveMember(member.subscriber.id)}
                               className="p-1 text-slate-400 hover:text-red-500 transition-colors"
                               title="Remove Member"
                             >
                               <UserMinus className="h-3.5 w-3.5" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       ))}
@@ -564,20 +565,20 @@ export const Groups: React.FC = () => {
                     <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-850">
                       <span className="text-[10px] text-slate-400">Page {membersPage} of {membersTotalPages}</span>
                       <div className="flex space-x-1">
-                        <button
+                        <Button
                           disabled={membersPage <= 1}
                           onClick={() => setMembersPage(membersPage - 1)}
                           className="p-0.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
                         >
                           <ChevronLeft className="h-3 w-3" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={membersPage >= membersTotalPages}
                           onClick={() => setMembersPage(membersPage + 1)}
                           className="p-0.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
                         >
                           <ChevronRight className="h-3 w-3" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -601,12 +602,12 @@ export const Groups: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Create Recipient Group
               </h3>
-              <button
+              <Button
                 onClick={() => setCreateModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleCreateGroup}>
@@ -644,20 +645,20 @@ export const Groups: React.FC = () => {
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Saving..." : "Create Group"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -672,12 +673,12 @@ export const Groups: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Edit Group Properties
               </h3>
-              <button
+              <Button
                 onClick={() => setEditModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleEditGroup}>
@@ -715,20 +716,20 @@ export const Groups: React.FC = () => {
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Saving..." : "Save Changes"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -752,20 +753,20 @@ export const Groups: React.FC = () => {
               </p>
             </div>
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
                 className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 text-sm font-semibold transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleDeleteGroup}
                 disabled={formLoading}
                 className="px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {formLoading ? "Deleting..." : "Delete Group"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -779,7 +780,7 @@ export const Groups: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Add Member to Group
               </h3>
-              <button
+              <Button
                 onClick={() => {
                   setAddSubModalOpen(false);
                   setSubSearch("");
@@ -788,7 +789,7 @@ export const Groups: React.FC = () => {
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -800,13 +801,13 @@ export const Groups: React.FC = () => {
                   onChange={(e) => setSubSearch(e.target.value)}
                   className="block flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
                 />
-                <button
+                <Button
                   onClick={searchSubscribersToAdd}
                   disabled={subSearchLoading}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer"
                 >
                   Search
-                </button>
+                </Button>
               </div>
 
               {subSearchLoading ? (
@@ -832,12 +833,12 @@ export const Groups: React.FC = () => {
                           {sub.phoneNumber}
                         </p>
                       </div>
-                      <button
+                      <Button
                         onClick={() => handleAddMember(sub.id)}
                         className="inline-flex items-center justify-center px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold transition-colors cursor-pointer"
                       >
                         <UserPlus className="h-3 w-3 mr-1" /> Add
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>

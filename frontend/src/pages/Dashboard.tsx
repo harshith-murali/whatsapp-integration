@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
 import { hasPermission } from "../utils/permissions.js";
+import { AnimatedBackground } from "../components/core/animated-background.js";
+import { BorderTrail } from "../components/core/border-trail.js";
 import {
   Users,
   UserX,
@@ -264,6 +266,51 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const MetricCard = ({
+    name,
+    value,
+    icon: Icon,
+    tone = "indigo",
+    pulse = false,
+  }: {
+    name: string;
+    value: string;
+    icon: React.ComponentType<{ className?: string }>;
+    tone?: "indigo" | "rose" | "emerald";
+    pulse?: boolean;
+  }) => {
+    const toneClass =
+      tone === "rose"
+        ? "bg-rose-50 text-rose-650 dark:bg-rose-950/30 dark:text-rose-400"
+        : tone === "emerald"
+          ? "bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-400"
+          : "bg-indigo-50 text-indigo-650 dark:bg-indigo-950/30 dark:text-indigo-350";
+
+    return (
+      <div
+        data-id={name}
+        className="group flex h-full min-h-32 flex-col justify-between rounded-lg border border-white/80 bg-white/90 p-5 shadow-xs transition-transform duration-300 hover:-translate-y-0.5 dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
+      >
+        <BorderTrail />
+        <div
+          className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClass} ${
+            pulse ? "animate-pulse" : ""
+          }`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="mt-4">
+          <span className="block text-xs font-semibold text-slate-455 dark:text-slate-500">
+            {name}
+          </span>
+          <strong className="mt-1 block font-mono text-2xl font-bold text-slate-900 dark:text-white">
+            {value}
+          </strong>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 animate-fade-in">
       {/* SUPER ADMIN admin accounts header row */}
@@ -290,23 +337,14 @@ export const Dashboard: React.FC = () => {
       <div>
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">Subscriber Metrics</h3>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {subMetrics.map((metric) => {
-            const Icon = metric.icon;
-            return (
-              <div
-                key={metric.name}
-                className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-650 dark:bg-indigo-950/30 dark:text-indigo-350">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="mt-4">
-                  <span className="text-xs text-slate-455 dark:text-slate-500 font-semibold block">{metric.name}</span>
-                  <strong className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block font-mono">{metric.value}</strong>
-                </div>
-              </div>
-            );
-          })}
+          <AnimatedBackground
+            className="rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20"
+            enableHover
+          >
+            {subMetrics.map((metric) => (
+              <MetricCard key={metric.name} {...metric} />
+            ))}
+          </AnimatedBackground>
         </div>
       </div>
 
@@ -315,23 +353,14 @@ export const Dashboard: React.FC = () => {
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">Campaign Statistics</h3>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {bcMetrics.map((metric) => {
-              const Icon = metric.icon;
-              return (
-                <div
-                  key={metric.name}
-                  className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-655 dark:bg-indigo-950/30 dark:text-indigo-350">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="mt-4">
-                    <span className="text-xs text-slate-455 dark:text-slate-500 font-semibold block">{metric.name}</span>
-                    <strong className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block font-mono">{metric.value}</strong>
-                  </div>
-                </div>
-              );
-            })}
+            <AnimatedBackground
+              className="rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20"
+              enableHover
+            >
+              {bcMetrics.map((metric) => (
+                <MetricCard key={metric.name} {...metric} />
+              ))}
+            </AnimatedBackground>
           </div>
         </div>
       )}
@@ -341,29 +370,19 @@ export const Dashboard: React.FC = () => {
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-455 mb-3">Live Queue & Worker Engine</h3>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {engineMetrics.map((metric) => {
-              const Icon = metric.icon;
-              return (
-                <div
+            <AnimatedBackground
+              className="rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20"
+              enableHover
+            >
+              {engineMetrics.map((metric) => (
+                <MetricCard
                   key={metric.name}
-                  className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
-                >
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                    metric.isAlert
-                      ? "bg-rose-50 text-rose-650 dark:bg-rose-950/30 dark:text-rose-400"
-                      : metric.isGreen
-                      ? "bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-400"
-                      : "bg-indigo-50 text-indigo-650 dark:bg-indigo-950/30 dark:text-indigo-350"
-                  } ${metric.isPulse ? "animate-pulse" : ""}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="mt-4">
-                    <span className="text-xs text-slate-455 dark:text-slate-500 font-semibold block">{metric.name}</span>
-                    <strong className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block font-mono">{metric.value}</strong>
-                  </div>
-                </div>
-              );
-            })}
+                  {...metric}
+                  tone={metric.isAlert ? "rose" : metric.isGreen ? "emerald" : "indigo"}
+                  pulse={metric.isPulse}
+                />
+              ))}
+            </AnimatedBackground>
           </div>
         </div>
       )}
@@ -373,27 +392,18 @@ export const Dashboard: React.FC = () => {
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">My Workspace Statistics</h3>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {opMetrics.map((metric) => {
-              const Icon = metric.icon;
-              return (
-                <div
+            <AnimatedBackground
+              className="rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20"
+              enableHover
+            >
+              {opMetrics.map((metric) => (
+                <MetricCard
                   key={metric.name}
-                  className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
-                >
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                    metric.isAlert
-                      ? "bg-rose-50 text-rose-650 dark:bg-rose-950/30"
-                      : "bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-350"
-                  }`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="mt-4">
-                    <span className="text-xs text-slate-455 dark:text-slate-500 font-semibold block">{metric.name}</span>
-                    <strong className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block font-mono">{metric.value}</strong>
-                  </div>
-                </div>
-              );
-            })}
+                  {...metric}
+                  tone={metric.isAlert ? "rose" : "emerald"}
+                />
+              ))}
+            </AnimatedBackground>
           </div>
         </div>
       )}
@@ -444,7 +454,7 @@ export const Dashboard: React.FC = () => {
             {hasPermission(admin?.role, "subscribers.create") && (
               <Link
                 to="/subscribers?add=true"
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-indigo-650 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add Subscriber

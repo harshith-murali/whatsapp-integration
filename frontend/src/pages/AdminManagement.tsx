@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
+import { SelectMenu } from "../components/ui/select-menu.js";
+import { Button } from "../components/ui/button.js";
 import {
   Plus,
   Edit2,
@@ -40,6 +42,16 @@ export const AdminManagement: React.FC = () => {
   const [adminActive, setAdminActive] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const roleOptions = [
+    { value: "VIEWER", label: "VIEWER" },
+    { value: "OPERATOR", label: "OPERATOR" },
+    { value: "ADMIN", label: "ADMIN" },
+    { value: "SUPER_ADMIN", label: "SUPER ADMIN" },
+  ];
+  const accountStatusOptions = [
+    { value: "true", label: "Active" },
+    { value: "false", label: "Inactive" },
+  ];
 
   const fetchAdmins = async () => {
     try {
@@ -198,13 +210,13 @@ export const AdminManagement: React.FC = () => {
             Create, update, and manage access roles for administrators.
           </p>
         </div>
-        <button
+        <Button
           onClick={openCreateModal}
           className="inline-flex items-center justify-center px-4.5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm shadow-md hover:bg-indigo-700 transition-colors cursor-pointer"
         >
           <Plus className="h-4 w-4 mr-2" />
           Create Admin
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -262,7 +274,7 @@ export const AdminManagement: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
+                        <Button
                           disabled={isSelf}
                           onClick={() => toggleAdminStatus(adm)}
                           className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors focus:outline-hidden ${
@@ -274,21 +286,21 @@ export const AdminManagement: React.FC = () => {
                         >
                           <Power className="h-3.5 w-3.5" />
                           <span>{adm.isActive ? "Active" : "Inactive"}</span>
-                        </button>
+                        </Button>
                       </td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
                         {new Date(adm.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end space-x-2">
-                          <button
+                          <Button
                             onClick={() => openEditModal(adm)}
                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                             title="Edit Admin"
                           >
                             <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             disabled={isSelf}
                             onClick={() => openDeleteConfirm(adm)}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
@@ -299,7 +311,7 @@ export const AdminManagement: React.FC = () => {
                             title={isSelf ? "Cannot delete yourself" : "Delete Admin"}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -323,12 +335,12 @@ export const AdminManagement: React.FC = () => {
                   Create Admin Account
                 </h3>
               </div>
-              <button
+              <Button
                 onClick={() => setCreateModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleCreateAdmin}>
@@ -389,53 +401,49 @@ export const AdminManagement: React.FC = () => {
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Role Selection
                     </label>
-                    <select
+                    <SelectMenu
                       value={adminRole}
-                      onChange={(e) =>
+                      options={roleOptions}
+                      onValueChange={(value) =>
                         setAdminRole(
-                          e.target.value as "SUPER_ADMIN" | "ADMIN" | "OPERATOR" | "VIEWER"
+                          value as "SUPER_ADMIN" | "ADMIN" | "OPERATOR" | "VIEWER"
                         )
                       }
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="VIEWER">VIEWER</option>
-                      <option value="OPERATOR">OPERATOR</option>
-                      <option value="ADMIN">ADMIN</option>
-                      <option value="SUPER_ADMIN">SUPER ADMIN</option>
-                    </select>
+                      label="Role"
+                      side="top"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Account Status
                     </label>
-                    <select
+                    <SelectMenu
                       value={adminActive ? "true" : "false"}
-                      onChange={(e) => setAdminActive(e.target.value === "true")}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
+                      options={accountStatusOptions}
+                      onValueChange={(value) => setAdminActive(value === "true")}
+                      label="Account status"
+                      side="top"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Creating..." : "Create Account"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -450,12 +458,12 @@ export const AdminManagement: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Edit Admin Account
               </h3>
-              <button
+              <Button
                 onClick={() => setEditModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleEditAdmin}>
@@ -512,53 +520,49 @@ export const AdminManagement: React.FC = () => {
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Role Selection
                     </label>
-                    <select
+                    <SelectMenu
                       value={adminRole}
-                      onChange={(e) =>
+                      options={roleOptions}
+                      onValueChange={(value) =>
                         setAdminRole(
-                          e.target.value as "SUPER_ADMIN" | "ADMIN" | "OPERATOR" | "VIEWER"
+                          value as "SUPER_ADMIN" | "ADMIN" | "OPERATOR" | "VIEWER"
                         )
                       }
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="VIEWER">VIEWER</option>
-                      <option value="OPERATOR">OPERATOR</option>
-                      <option value="ADMIN">ADMIN</option>
-                      <option value="SUPER_ADMIN">SUPER ADMIN</option>
-                    </select>
+                      label="Role"
+                      side="top"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Account Status
                     </label>
-                    <select
+                    <SelectMenu
                       value={adminActive ? "true" : "false"}
-                      onChange={(e) => setAdminActive(e.target.value === "true")}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
+                      options={accountStatusOptions}
+                      onValueChange={(value) => setAdminActive(value === "true")}
+                      label="Account status"
+                      side="top"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Saving..." : "Save Changes"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -582,20 +586,20 @@ export const AdminManagement: React.FC = () => {
               </p>
             </div>
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
                 className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleDeleteAdmin}
                 disabled={formLoading}
                 className="px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {formLoading ? "Deleting..." : "Delete Account"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

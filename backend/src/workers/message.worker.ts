@@ -406,6 +406,8 @@ async function processMessage(message: any) {
       message: message.broadcast.message,
       metadata: {
         templateSnapshot: message.broadcast.templateSnapshot,
+        templateName: message.broadcast.templateName,
+        templateLanguage: message.broadcast.templateLanguage,
         templateVariables: message.broadcast.templateVariables,
       },
     });
@@ -545,6 +547,9 @@ async function processMessage(message: any) {
             failedAt: new Date(),
             errorCode: isRetryable ? "RETRIES_EXHAUSTED" : errCode,
             errorMessage: isRetryable ? `Retries exhausted after ${MAX_RETRIES} attempts. Final error: ${errMsg}` : errMsg,
+            failureCategory: isRetryable ? "RETRIES_EXHAUSTED" : "PERMANENT_PROVIDER_FAILURE",
+            requiresManualReview: true,
+            deadLetteredAt: new Date(),
             workerId: null,
             claimToken: null,
             claimExpiresAt: null,

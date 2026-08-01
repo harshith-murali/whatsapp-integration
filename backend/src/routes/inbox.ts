@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { AdminRole } from "../generated/prisma/client.js";
+import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import {
   assignInboxMessage,
   getInbox,
@@ -18,4 +19,4 @@ router.get("/", getInbox);
 router.get("/:id", getInboxMessage);
 router.patch("/:id/status", updateInboxStatus);
 router.patch("/:id/assign", assignInboxMessage);
-router.post("/:id/reply", replyToInboxMessage);
+router.post("/:id/reply", idempotencyMiddleware, replyToInboxMessage);

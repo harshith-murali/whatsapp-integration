@@ -14,7 +14,9 @@ export const mapMetaError = (args: {
   const providerCode = error.code !== undefined ? String(error.code) : undefined;
   const providerSubcode = error.error_subcode !== undefined ? String(error.error_subcode) : undefined;
   const providerType = error.type !== undefined ? String(error.type) : undefined;
-  const message = sanitize(error.message || (args.cause instanceof Error ? args.cause.message : undefined));
+  const detail = typeof error.error_data?.details === "string" ? error.error_data.details : undefined;
+  const baseMessage = error.message || (args.cause instanceof Error ? args.cause.message : undefined);
+  const message = sanitize(detail ? `${baseMessage || "Meta API request failed"} - ${detail}` : baseMessage);
   const status = args.status;
 
   if (!status) {

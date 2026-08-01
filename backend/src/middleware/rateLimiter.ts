@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 interface RateLimitStore {
-  [ip: string]: {
+  [key: string]: {
     count: number;
     resetTime: number;
   };
@@ -9,39 +9,42 @@ interface RateLimitStore {
 
 const store: RateLimitStore = {};
 
-export const loginRateLimiter = (
-  windowMs: number = 60 * 1000, // 60 seconds
-  maxRequests: number = 5 // max 5 login requests per window
-) => {
+export const createRateLimiter = (args: {
+  name: string;
+  windowMs: number;
+  maxRequests: number;
+  keyPrefix?: string;
+}) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const key = `${args.keyPrefix || args.name}:${ip}`;
     const now = Date.now();
 
-    if (!store[ip]) {
-      store[ip] = {
+    if (!store[key]) {
+      store[key] = {
         count: 1,
-        resetTime: now + windowMs,
+        resetTime: now + args.windowMs,
       };
       next();
       return;
     }
 
-    const client = store[ip]!;
+    const client = store[key]!;
 
     if (now > client.resetTime) {
       client.count = 1;
-      client.resetTime = now + windowMs;
+      client.resetTime = now + args.windowMs;
       next();
       return;
     }
 
     client.count++;
 
-    if (client.count > maxRequests) {
+    if (client.count > args.maxRequests) {
       const secondsLeft = Math.ceil((client.resetTime - now) / 1000);
       res.status(429).json({
         success: false,
-        message: `Too many login attempts. Please try again in ${secondsLeft} seconds.`,
+        message: `Too many requests. Please try again in ${secondsLeft} seconds.`,
       });
       return;
     }
@@ -49,3 +52,6 @@ export const loginRateLimiter = (
     next();
   };
 };
+
+export const loginRateLimiter = (windowMs = 60 * 1000, maxRequests = 5) =>
+  createRateLimiter({ name: "login", windowMs, maxRequests });

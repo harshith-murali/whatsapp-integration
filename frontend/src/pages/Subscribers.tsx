@@ -5,11 +5,24 @@ import { useLocation } from "react-router-dom";
 import { hasPermission } from "../utils/permissions.js";
 import { countryCodes, splitPhoneNumber } from "../utils/countryCodes.js";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu.js";
+import { SelectMenu } from "../components/ui/select-menu.js";
+import { Button } from "../components/ui/button.js";
+import {
   Plus,
   Search,
   Filter,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Edit2,
   Trash2,
   X,
@@ -101,6 +114,53 @@ export const Subscribers: React.FC = () => {
   const canUpdate = hasPermission(admin?.role, "subscribers.update");
   const canDelete = hasPermission(admin?.role, "subscribers.delete");
   const showActionsColumn = canUpdate || canDelete;
+  const selectedCountry = countryCodes.find((country) => country.code === subCountryCode) || countryCodes[0];
+  const subscriberStatusOptions = [
+    { value: "ACTIVE", label: "ACTIVE" },
+    { value: "UNSUBSCRIBED", label: "UNSUBSCRIBED" },
+    { value: "BLOCKED", label: "BLOCKED" },
+  ];
+  const filterStatusOptions = [{ value: "", label: "All Statuses" }, ...subscriberStatusOptions];
+  const optInFilterOptions = [
+    { value: "", label: "All Opt-ins" },
+    { value: "true", label: "Opted In Only" },
+    { value: "false", label: "Opted Out Only" },
+  ];
+  const optInOptions = [
+    { value: "true", label: "Opted In" },
+    { value: "false", label: "Opted Out" },
+  ];
+
+  const CountryCodePicker = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex h-[42px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-white focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-200">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="text-xs text-slate-400">{selectedCountry.iso}</span>
+          <span>{selectedCountry.code}</span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="max-h-72 w-72 overflow-y-auto" align="start">
+        <DropdownMenuLabel>Country code</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          {countryCodes.map((country) => (
+            <DropdownMenuItem
+              key={`${country.iso}-${country.code}`}
+              onSelect={() => setSubCountryCode(country.code)}
+              className={country.code === subCountryCode ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300" : ""}
+            >
+              <span className="min-w-0 truncate">
+                <span className="mr-2 font-bold text-slate-400">{country.iso}</span>
+                {country.name}
+              </span>
+              <DropdownMenuShortcut>{country.code}</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -212,13 +272,13 @@ export const Subscribers: React.FC = () => {
           </p>
         </div>
         {canCreate && (
-          <button
+          <Button
             onClick={openCreateModal}
             className="inline-flex items-center justify-center px-4.5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm shadow-md hover:bg-indigo-700 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Subscriber
-          </button>
+          </Button>
         )}
       </div>
 
@@ -241,12 +301,12 @@ export const Subscribers: React.FC = () => {
               className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
             />
           </div>
-          <button
+          <Button
             type="submit"
             className="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-sm font-semibold transition-colors cursor-pointer"
           >
             Search
-          </button>
+          </Button>
         </form>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -257,32 +317,29 @@ export const Subscribers: React.FC = () => {
             </span>
           </div>
 
-          <select
+          <SelectMenu
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+            options={filterStatusOptions}
+            onValueChange={(value) => {
+              setStatus(value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="UNSUBSCRIBED">UNSUBSCRIBED</option>
-            <option value="BLOCKED">BLOCKED</option>
-          </select>
+            label="Status"
+            className="w-44"
+            contentClassName="w-48"
+          />
 
-          <select
+          <SelectMenu
             value={optedIn}
-            onChange={(e) => {
-              setOptedIn(e.target.value);
+            options={optInFilterOptions}
+            onValueChange={(value) => {
+              setOptedIn(value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-          >
-            <option value="">All Opt-ins</option>
-            <option value="true">Opted In Only</option>
-            <option value="false">Opted Out Only</option>
-          </select>
+            label="Opt-in"
+            className="w-44"
+            contentClassName="w-48"
+          />
         </div>
       </div>
 
@@ -375,22 +432,22 @@ export const Subscribers: React.FC = () => {
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end space-x-2">
                             {canUpdate && (
-                              <button
+                              <Button
                                 onClick={() => openEditModal(sub)}
                                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                                 title="Edit Subscriber"
                               >
                                 <Edit2 className="h-4 w-4" />
-                              </button>
+                              </Button>
                             )}
                             {canDelete && (
-                              <button
+                              <Button
                                 onClick={() => openDeleteConfirm(sub)}
                                 className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors cursor-pointer"
                                 title="Delete Subscriber"
                               >
                                 <Trash2 className="h-4 w-4" />
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </td>
@@ -410,20 +467,20 @@ export const Subscribers: React.FC = () => {
                 <strong className="text-slate-900 dark:text-white">{totalPages}</strong> ({total} total records)
               </span>
               <div className="flex space-x-2">
-                <button
+                <Button
                   disabled={page <= 1}
                   onClick={() => setPage(page - 1)}
                   className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 dark:border-tail-dark-border dark:hover:bg-slate-700 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
+                </Button>
+                <Button
                   disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
                   className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 dark:border-tail-dark-border dark:hover:bg-slate-700 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <ChevronRight className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -442,12 +499,12 @@ export const Subscribers: React.FC = () => {
                   Add New Subscriber
                 </h3>
               </div>
-              <button
+              <Button
                 onClick={() => setCreateModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleCreateSubscriber}>
@@ -475,18 +532,8 @@ export const Subscribers: React.FC = () => {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Phone Number (Required)
                   </label>
-                  <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-2">
-                    <select
-                      value={subCountryCode}
-                      onChange={(e) => setSubCountryCode(e.target.value)}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      {countryCodes.map((country) => (
-                        <option key={`${country.iso}-${country.code}`} value={country.code}>
-                          {country.iso} {country.code}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-[156px_minmax(0,1fr)] gap-2">
+                    <CountryCodePicker />
                     <input
                       type="tel"
                       required
@@ -506,50 +553,45 @@ export const Subscribers: React.FC = () => {
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Status
                     </label>
-                    <select
+                    <SelectMenu
                       value={subStatus}
-                      onChange={(e) =>
-                        setSubStatus(e.target.value as "ACTIVE" | "UNSUBSCRIBED" | "BLOCKED")
+                      options={subscriberStatusOptions}
+                      onValueChange={(value) =>
+                        setSubStatus(value as "ACTIVE" | "UNSUBSCRIBED" | "BLOCKED")
                       }
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="UNSUBSCRIBED">UNSUBSCRIBED</option>
-                      <option value="BLOCKED">BLOCKED</option>
-                    </select>
+                      label="Status"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Opted In (Opt-in State)
                     </label>
-                    <select
+                    <SelectMenu
                       value={subOptedIn ? "true" : "false"}
-                      onChange={(e) => setSubOptedIn(e.target.value === "true")}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="true">Opted In</option>
-                      <option value="false">Opted Out</option>
-                    </select>
+                      options={optInOptions}
+                      onValueChange={(value) => setSubOptedIn(value === "true")}
+                      label="Opt-in state"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Saving..." : "Add Subscriber"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -564,12 +606,12 @@ export const Subscribers: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Edit Subscriber Details
               </h3>
-              <button
+              <Button
                 onClick={() => setEditModalOpen(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleEditSubscriber}>
@@ -597,18 +639,8 @@ export const Subscribers: React.FC = () => {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Phone Number (Required)
                   </label>
-                  <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-2">
-                    <select
-                      value={subCountryCode}
-                      onChange={(e) => setSubCountryCode(e.target.value)}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      {countryCodes.map((country) => (
-                        <option key={`${country.iso}-${country.code}`} value={country.code}>
-                          {country.iso} {country.code}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-[156px_minmax(0,1fr)] gap-2">
+                    <CountryCodePicker />
                     <input
                       type="tel"
                       required
@@ -625,50 +657,45 @@ export const Subscribers: React.FC = () => {
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Status
                     </label>
-                    <select
+                    <SelectMenu
                       value={subStatus}
-                      onChange={(e) =>
-                        setSubStatus(e.target.value as "ACTIVE" | "UNSUBSCRIBED" | "BLOCKED")
+                      options={subscriberStatusOptions}
+                      onValueChange={(value) =>
+                        setSubStatus(value as "ACTIVE" | "UNSUBSCRIBED" | "BLOCKED")
                       }
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="UNSUBSCRIBED">UNSUBSCRIBED</option>
-                      <option value="BLOCKED">BLOCKED</option>
-                    </select>
+                      label="Status"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                       Opted In (Opt-in State)
                     </label>
-                    <select
+                    <SelectMenu
                       value={subOptedIn ? "true" : "false"}
-                      onChange={(e) => setSubOptedIn(e.target.value === "true")}
-                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-                    >
-                      <option value="true">Opted In</option>
-                      <option value="false">Opted Out</option>
-                    </select>
+                      options={optInOptions}
+                      onValueChange={(value) => setSubOptedIn(value === "true")}
+                      label="Opt-in state"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
                   className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={formLoading}
                   className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {formLoading ? "Saving..." : "Save Changes"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -692,20 +719,20 @@ export const Subscribers: React.FC = () => {
               </p>
             </div>
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
                 className="px-4 py-2.5 rounded-lg text-slate-500 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleDeleteSubscriber}
                 disabled={formLoading}
                 className="px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-semibold shadow-md disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {formLoading ? "Deleting..." : "Delete Permanently"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

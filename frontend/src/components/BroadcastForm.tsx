@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../api/index.js";
 import { AlertCircle, Save, Send } from "lucide-react";
+import { SelectMenu } from "./ui/select-menu.js";
+import { Button } from "./ui/button.js";
 
 interface GroupOption {
   id: number;
@@ -41,6 +43,23 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
   const [groupId, setGroupId] = useState<number | "">(initialValues?.groupId || "");
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const categoryOptions = [
+    { value: "ANNOUNCEMENT", label: "Announcement" },
+    { value: "EMERGENCY", label: "Emergency" },
+    { value: "SERVICE_UPDATE", label: "Service Update" },
+    { value: "REMINDER", label: "Reminder" },
+    { value: "OTHER", label: "Other" },
+  ];
+  const severityOptions = [
+    { value: "LOW", label: "Low" },
+    { value: "MEDIUM", label: "Medium" },
+    { value: "HIGH", label: "High" },
+    { value: "CRITICAL", label: "Critical" },
+  ];
+  const audienceOptions = [
+    { value: "ALL_ACTIVE_SUBSCRIBERS", label: "All Active Subscribers" },
+    { value: "GROUP", label: "Group" },
+  ];
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -131,33 +150,24 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Category
             </label>
-            <select
+            <SelectMenu
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-            >
-              <option value="ANNOUNCEMENT">Announcement</option>
-              <option value="EMERGENCY">Emergency</option>
-              <option value="SERVICE_UPDATE">Service Update</option>
-              <option value="REMINDER">Reminder</option>
-              <option value="OTHER">Other</option>
-            </select>
+              options={categoryOptions}
+              onValueChange={setCategory}
+              label="Category"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Severity
             </label>
-            <select
+            <SelectMenu
               value={severity}
-              onChange={(e) => setSeverity(e.target.value)}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-            >
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="CRITICAL">Critical</option>
-            </select>
+              options={severityOptions}
+              onValueChange={setSeverity}
+              label="Severity"
+            />
           </div>
         </div>
 
@@ -167,36 +177,31 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Audience Type
             </label>
-            <select
+            <SelectMenu
               value={audienceType}
-              onChange={(e) => {
-                setAudienceType(e.target.value);
-                if (e.target.value !== "GROUP") setGroupId("");
+              options={audienceOptions}
+              onValueChange={(value) => {
+                setAudienceType(value);
+                if (value !== "GROUP") setGroupId("");
               }}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
-            >
-              <option value="ALL_ACTIVE_SUBSCRIBERS">All Active Subscribers</option>
-              <option value="GROUP">Group</option>
-            </select>
+              label="Audience"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Recipient Group
             </label>
-            <select
+            <SelectMenu
               disabled={audienceType !== "GROUP"}
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : "")}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Select Group...</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+              value={String(groupId)}
+              options={[
+                { value: "", label: "Select Group..." },
+                ...groups.map((group) => ({ value: String(group.id), label: group.name })),
+              ]}
+              onValueChange={(value) => setGroupId(value ? Number(value) : "")}
+              label="Recipient group"
+            />
           </div>
         </div>
 
@@ -219,7 +224,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
 
         {/* Save/Submit Controls */}
         <div className="flex justify-end space-x-3 pt-3 border-t border-tail-border dark:border-tail-dark-border">
-          <button
+          <Button
             type="button"
             disabled={loading}
             onClick={() => handleAction(false)}
@@ -227,8 +232,8 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
           >
             <Save className="h-4 w-4 mr-2" />
             Save Draft
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading}
             onClick={() => handleAction(true)}
@@ -236,7 +241,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
           >
             <Send className="h-4 w-4 mr-2" />
             Submit for Approval
-          </button>
+          </Button>
         </div>
       </div>
 

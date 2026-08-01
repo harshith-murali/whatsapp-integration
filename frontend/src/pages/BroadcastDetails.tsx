@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
+import { Button } from "../components/ui/button.js";
 import {
   ArrowLeft,
   XCircle,
@@ -319,14 +320,14 @@ export const BroadcastDetails: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           {isAdminOrSuper && isTerminal && (
-            <button
+            <Button
               disabled={requeueingBroadcast}
               onClick={handleRequeueFailedBroadcast}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs shadow-2xs transition-colors cursor-pointer disabled:opacity-40"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               {requeueingBroadcast ? "Requeueing..." : "Requeue Failed"}
-            </button>
+            </Button>
           )}
 
           <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border uppercase ${getStatusBadge(broadcast.status)}`}>
@@ -497,13 +498,13 @@ export const BroadcastDetails: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-right">
                               {isAdminOrSuper && msg.status === "FAILED" && (
-                                <button
+                                <Button
                                   disabled={requeueingId === msg.id}
                                   onClick={() => handleRequeueMessage(msg.id)}
                                   className="inline-flex px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-750 hover:bg-indigo-100 font-bold text-[9px] cursor-pointer transition-colors"
                                 >
                                   {requeueingId === msg.id ? "Loading..." : "Requeue"}
-                                </button>
+                                </Button>
                               )}
                             </td>
                           </tr>
@@ -517,20 +518,20 @@ export const BroadcastDetails: React.FC = () => {
                     <div className="flex justify-between items-center pt-2 text-xs">
                       <span className="text-slate-400">Page {msgPage} of {msgTotalPages} ({msgTotal} messages)</span>
                       <div className="flex space-x-1">
-                        <button
+                        <Button
                           disabled={msgPage <= 1}
                           onClick={() => setMsgPage(msgPage - 1)}
                           className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                         >
                           <ChevronLeft className="h-3 w-3" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={msgPage >= msgTotalPages}
                           onClick={() => setMsgPage(msgPage + 1)}
                           className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                         >
                           <ChevronRight className="h-3 w-3" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import { AdminRole } from "../generated/prisma/client.js";
 import { getMessages, getMessageById, requeueMessage } from "../controllers/message.js";
 
@@ -22,5 +23,6 @@ router.get(
 router.post(
   "/:id/requeue",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
+  idempotencyMiddleware,
   requeueMessage
 );

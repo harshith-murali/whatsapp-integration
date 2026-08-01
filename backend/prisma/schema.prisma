@@ -110,6 +110,11 @@ enum MessageAttemptResult {
   PERMANENT_FAILURE
 }
 
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+}
+
 model Admin {
   id                 Int                     @id @default(autoincrement())
   name               String
@@ -256,6 +261,10 @@ model Message {
   providerErrorType   String?              @map("provider_error_type")
   providerErrorTitle  String?              @map("provider_error_title")
   providerErrorDetails String?             @db.Text @map("provider_error_details")
+  failureCategory      String?             @map("failure_category")
+  requiresManualReview Boolean             @default(false) @map("requires_manual_review")
+  deadLetteredAt       DateTime?           @map("dead_lettered_at")
+  deadLetterResolvedAt DateTime?           @map("dead_letter_resolved_at")
   lastWebhookAt       DateTime?            @map("last_webhook_at")
   latestProviderTimestamp DateTime?        @map("latest_provider_timestamp")
   workerId            String?              @map("worker_id")
@@ -390,6 +399,25 @@ model WebhookEvent {
   @@index([processingStatus, receivedAt])
   @@index([receivedAt])
   @@map("webhook_events")
+}
+
+model IdempotencyKey {
+  id             Int               @id @default(autoincrement())
+  key            String
+  adminId        Int?              @map("admin_id")
+  route          String
+  requestHash    String            @map("request_hash")
+  status         IdempotencyStatus @default(PROCESSING)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+  expiresAt      DateTime          @map("expires_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@unique([key, route])
+  @@index([adminId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
 
 model AuditLog {
