@@ -92,6 +92,7 @@ export const Broadcasts: React.FC = () => {
   const canApprove = hasPermission(admin?.role, "broadcasts.approve");
   const canQueue = hasPermission(admin?.role, "broadcasts.queue");
   const canCancel = hasPermission(admin?.role, "broadcasts.cancel");
+  const canDelete = hasPermission(admin?.role, "broadcasts.delete");
   const statusFilterOptions = [
     { value: "", label: "All Statuses" },
     { value: "DRAFT", label: "DRAFT" },
@@ -295,9 +296,12 @@ export const Broadcasts: React.FC = () => {
   };
 
   const handleDeleteBroadcast = async (id: number) => {
+    const broadcast = broadcasts.find((bc) => bc.id === id);
+    const label = broadcast?.status === "DRAFT" ? "draft" : "broadcast";
+
     setConfirmation({
-      title: "Delete Campaign Draft",
-      description: "Permanently delete this campaign draft. This action cannot be undone.",
+      title: "Delete Broadcast",
+      description: `Permanently delete this ${label}. Related recipient message logs for this broadcast will also be removed. This action cannot be undone.`,
       confirmLabel: "Delete",
       tone: "danger",
       icon: AlertTriangle,
@@ -325,13 +329,29 @@ export const Broadcasts: React.FC = () => {
     }
   };
 
+  const canDeleteBroadcast = (bc: Broadcast) =>
+    canDelete && ["DRAFT", "REJECTED", "CANCELLED", "FAILED"].includes(bc.status);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "PENDING_APPROVAL":
+        return "Pending approval";
+      default:
+        return status
+          .toLowerCase()
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+    }
+  };
+
   // Status badge coloring
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-350 border-slate-200";
+        return "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-350 border-slate-200";
       case "PENDING_APPROVAL":
-        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400";
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50";
       case "APPROVED":
         return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400";
       case "REJECTED":
@@ -519,7 +539,7 @@ export const Broadcasts: React.FC = () => {
                     <th className="px-5 py-4">Category</th>
                     <th className="px-5 py-4">Severity</th>
                     <th className="px-5 py-4">Recipients</th>
-                    <th className="px-5 py-4">Status</th>
+                    <th className="px-5 py-4 w-[160px]">Status</th>
                     <th className="px-5 py-4">Created By</th>
                     <th className="px-5 py-4 text-right">Actions</th>
                   </tr>
@@ -554,9 +574,9 @@ export const Broadcasts: React.FC = () => {
                       <td className="px-5 py-4 text-slate-600 dark:text-slate-300 font-semibold font-mono">
                         {bc.totalRecipients.toLocaleString()}
                       </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(bc.status)}`}>
-                          {bc.status.replace("_", " ")}
+                      <td className="px-5 py-4 w-[160px]">
+                        <span className={`inline-flex min-w-[116px] items-center justify-center rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none tracking-wide ${getStatusBadge(bc.status)}`}>
+                          {getStatusLabel(bc.status)}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-slate-500 dark:text-slate-400">
@@ -590,13 +610,6 @@ export const Broadcasts: React.FC = () => {
                                 title="Submit for Approval"
                               >
                                 <Send className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                onClick={() => handleDeleteBroadcast(bc.id)}
-                                className="p-1 hover:bg-red-50 rounded text-slate-500 hover:text-red-650 dark:hover:bg-red-950/20"
-                                title="Delete Draft"
-                              >
-                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </>
                           )}
@@ -665,6 +678,16 @@ export const Broadcasts: React.FC = () => {
                               title="Cancel Queueing"
                             >
                               <StopCircle className="h-3.5 w-3.5 mr-1" /> Cancel
+                            </Button>
+                          )}
+
+                          {canDeleteBroadcast(bc) && (
+                            <Button
+                              onClick={() => handleDeleteBroadcast(bc.id)}
+                              className="p-1 hover:bg-red-50 rounded text-slate-500 hover:text-red-650 dark:hover:bg-red-950/20"
+                              title="Delete Broadcast"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>

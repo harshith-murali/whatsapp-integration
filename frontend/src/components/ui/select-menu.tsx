@@ -25,6 +25,7 @@ interface SelectMenuProps {
   disabled?: boolean;
   className?: string;
   contentClassName?: string;
+  align?: "start" | "end";
   side?: "bottom" | "top";
 }
 
@@ -37,6 +38,7 @@ export const SelectMenu: React.FC<SelectMenuProps> = ({
   disabled = false,
   className = "",
   contentClassName = "",
+  align = "start",
   side = "bottom",
 }) => {
   const selected = options.find((option) => option.value === value);
@@ -50,7 +52,7 @@ export const SelectMenu: React.FC<SelectMenuProps> = ({
         <span className="min-w-0 truncate">{selected?.label || placeholder}</span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className={`max-h-72 min-w-full overflow-y-auto ${contentClassName}`} align="start" side={side}>
+      <DropdownMenuContent className={`max-h-72 min-w-full overflow-y-auto ${contentClassName}`} align={align} side={side}>
         {label && (
           <>
             <DropdownMenuLabel>{label}</DropdownMenuLabel>

@@ -309,7 +309,7 @@ export const Subscribers: React.FC = () => {
           </Button>
         </form>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
           <div className="flex items-center space-x-2">
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -339,6 +339,7 @@ export const Subscribers: React.FC = () => {
             label="Opt-in"
             className="w-44"
             contentClassName="w-48"
+            align="end"
           />
         </div>
       </div>

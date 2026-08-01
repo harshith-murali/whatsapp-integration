@@ -347,6 +347,11 @@ export const approveAccessRequest = async (
         ],
       });
 
+      await tx.adminNotification.updateMany({
+        where: { entityType: ACCESS_REQUEST_ENTITY, entityId: request.id },
+        data: { isRead: true },
+      });
+
       return {
         updated,
         generatedPassword:
@@ -423,6 +428,11 @@ export const rejectAccessRequest = async (
         },
       });
 
+      await tx.adminNotification.updateMany({
+        where: { entityType: ACCESS_REQUEST_ENTITY, entityId: id },
+        data: { isRead: true },
+      });
+
       return rejected;
     });
 
@@ -472,6 +482,11 @@ export const withdrawAccessRequest = async (
           entityId: id,
           metadata: { requestId: id, requesterEmail: maskEmail(request.email) },
         },
+      });
+
+      await tx.adminNotification.updateMany({
+        where: { entityType: ACCESS_REQUEST_ENTITY, entityId: id },
+        data: { isRead: true },
       });
 
       return withdrawn;

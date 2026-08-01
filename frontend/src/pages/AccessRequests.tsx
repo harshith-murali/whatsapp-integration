@@ -112,6 +112,7 @@ export const AccessRequests: React.FC = () => {
   const [detail, setDetail] = useState<AccessRequestDetail | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
@@ -154,6 +155,7 @@ export const AccessRequests: React.FC = () => {
       const response = await api.get("/access-requests", { params: query });
       setRequests(response.data.data.requests);
       setTotalPages(response.data.data.totalPages || 1);
+      setTotal(response.data.data.total || 0);
       setPendingCount(response.data.data.pendingCount || 0);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load access requests.");
@@ -273,15 +275,27 @@ export const AccessRequests: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-4">
-        <div className="rounded-lg border border-tail-border bg-white p-4 shadow-sm dark:border-tail-dark-border dark:bg-tail-dark-card">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Pending</p>
-          <p className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{pendingCount}</p>
+      <div className="rounded-lg border border-tail-border bg-white p-5 shadow-sm dark:border-tail-dark-border dark:bg-tail-dark-card">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Access queue
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
+              Review admin access requests
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Filter requests, review applicant details, and create approved admin accounts from one place.
+            </p>
+          </div>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-3 xl:w-[520px]">
+            <SummaryCard label="Pending" value={pendingCount} tone="indigo" />
+            <SummaryCard label="Showing" value={requests.length} tone="slate" />
+            <SummaryCard label="Total" value={total} tone="emerald" />
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-lg border border-tail-border bg-white p-4 shadow-sm dark:border-tail-dark-border dark:bg-tail-dark-card">
-        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_200px_155px_155px_auto]">
+        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_200px] xl:grid-cols-[minmax(300px,1fr)_180px_200px_155px_155px_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -294,8 +308,8 @@ export const AccessRequests: React.FC = () => {
               className="h-[42px] w-full rounded-lg border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-900 outline-hidden focus:border-indigo-500 focus:bg-white dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
             />
           </div>
-          <SelectMenu value={status} options={statusOptions} onValueChange={(value) => { setPage(1); setStatus(value); }} />
-          <SelectMenu value={requestedRole} options={roleOptions} onValueChange={(value) => { setPage(1); setRequestedRole(value); }} />
+          <SelectMenu value={status} options={statusOptions} onValueChange={(value) => { setPage(1); setStatus(value); }} align="start" />
+          <SelectMenu value={requestedRole} options={roleOptions} onValueChange={(value) => { setPage(1); setRequestedRole(value); }} align="start" />
           <DateFilter
             label="From"
             value={dateFrom}
@@ -568,6 +582,25 @@ export const AccessRequests: React.FC = () => {
           </div>
         </Modal>
       )}
+    </div>
+  );
+};
+
+const SummaryCard: React.FC<{ label: string; value: number; tone: "indigo" | "emerald" | "slate" }> = ({
+  label,
+  value,
+  tone,
+}) => {
+  const toneClasses = {
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-900/40",
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/40",
+    slate: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-200 dark:border-tail-dark-border",
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${toneClasses}`}>
+      <p className="text-[11px] font-bold uppercase tracking-wider opacity-75">{label}</p>
+      <p className="mt-1 text-2xl font-bold leading-none">{value}</p>
     </div>
   );
 };

@@ -20,7 +20,7 @@ export const listMyNotifications = async (
     const adminId = req.admin!.id;
     const [notifications, unreadCount] = await Promise.all([
       prisma.adminNotification.findMany({
-        where: { adminId },
+        where: { adminId, isRead: false },
         orderBy: { createdAt: "desc" },
         take: 20,
       }),

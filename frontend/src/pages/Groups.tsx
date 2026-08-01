@@ -230,11 +230,18 @@ export const Groups: React.FC = () => {
   };
 
   // Search subscribers outside group to add
-  const searchSubscribersToAdd = async () => {
-    if (!subSearch.trim()) return;
+  const searchSubscribersToAdd = async (query = subSearch) => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 3) {
+      setSubSearchResults([]);
+      return;
+    }
+
     try {
       setSubSearchLoading(true);
-      const response = await api.get(`/subscribers?search=${subSearch}&limit=5`);
+      const response = await api.get(
+        `/subscribers?search=${encodeURIComponent(normalizedQuery)}&limit=5`
+      );
       if (response.data?.success) {
         // Exclude subscribers who are already members
         const currentMemberIds = new Set(members.map((m) => m.subscriber.id));
@@ -249,6 +256,23 @@ export const Groups: React.FC = () => {
       setSubSearchLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!addSubModalOpen) return;
+
+    const normalizedQuery = subSearch.trim();
+    if (normalizedQuery.length < 3) {
+      setSubSearchResults([]);
+      setSubSearchLoading(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      searchSubscribersToAdd(normalizedQuery);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [subSearch, addSubModalOpen, members]);
 
   const handleAddMember = async (subscriberId: number) => {
     if (!activeGroupView) return;
@@ -796,27 +820,34 @@ export const Groups: React.FC = () => {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Search subscriber name or phone..."
+                  placeholder="Type 3+ letters or digits..."
                   value={subSearch}
                   onChange={(e) => setSubSearch(e.target.value)}
                   className="block flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
                 />
                 <Button
-                  onClick={searchSubscribersToAdd}
-                  disabled={subSearchLoading}
+                  onClick={() => searchSubscribersToAdd()}
+                  disabled={subSearchLoading || subSearch.trim().length < 3}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer"
                 >
                   Search
                 </Button>
               </div>
+              <p className="text-xs text-slate-400">
+                Suggestions appear automatically after 3 characters.
+              </p>
 
               {subSearchLoading ? (
                 <div className="flex justify-center py-4">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
                 </div>
-              ) : subSearchResults.length === 0 && subSearch.trim() ? (
+              ) : subSearchResults.length === 0 && subSearch.trim().length >= 3 ? (
                 <p className="text-xs text-slate-400 italic text-center py-2">
                   No eligible subscribers found outside group.
+                </p>
+              ) : subSearch.trim().length > 0 && subSearch.trim().length < 3 ? (
+                <p className="text-xs text-slate-400 italic text-center py-2">
+                  Keep typing to see matching subscribers.
                 </p>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">

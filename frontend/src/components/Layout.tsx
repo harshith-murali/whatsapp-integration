@@ -415,9 +415,12 @@ export const Layout: React.FC = () => {
             {/* Notification Bell */}
             <div className="relative">
               <Button
-              onClick={() =>
-                setOpenMenu(openMenu === "notifications" ? null : "notifications")
-              }
+              onClick={() => {
+                if (openMenu !== "notifications") {
+                  fetchHeaderData();
+                }
+                setOpenMenu(openMenu === "notifications" ? null : "notifications");
+              }}
               className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               title="Notifications"
               aria-label="Notifications"
@@ -495,19 +498,23 @@ export const Layout: React.FC = () => {
                   <div className="p-2">
                     <Button
                       onClick={() => goTo("/messages")}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="grid w-full grid-cols-[28px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <MessageSquare className="h-4 w-4 text-indigo-500" />
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <span className="flex h-7 w-7 items-center justify-center">
+                        <MessageSquare className="h-4 w-4 text-indigo-500" />
+                      </span>
+                      <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Open message logs
                       </span>
                     </Button>
                     <Button
                       onClick={() => goTo("/subscribers?add=true")}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="grid w-full grid-cols-[28px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <Inbox className="h-4 w-4 text-emerald-500" />
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <span className="flex h-7 w-7 items-center justify-center">
+                        <Inbox className="h-4 w-4 text-emerald-500" />
+                      </span>
+                      <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Add subscriber
                       </span>
                     </Button>
@@ -537,7 +544,7 @@ export const Layout: React.FC = () => {
                 <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-white" />
               </Button>
               {openMenu === "profile" && (
-                <div className="absolute right-0 top-14 z-40 w-64 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
+                <div className="absolute right-0 top-14 z-40 w-72 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
                   <div className="border-b border-tail-border px-4 py-4 dark:border-tail-dark-border">
                     <p className="text-sm font-bold text-slate-900 dark:text-white">
                       {admin?.name}
@@ -552,28 +559,34 @@ export const Layout: React.FC = () => {
                   <div className="p-2">
                     <Button
                       onClick={() => goTo("/settings")}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <SettingsIcon className="h-4 w-4 text-slate-500" />
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500">
+                        <SettingsIcon className="h-4 w-4" />
+                      </span>
+                      <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Settings
                       </span>
                     </Button>
                     <Button
                       onClick={() => goTo("/admins")}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <User className="h-4 w-4 text-slate-500" />
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500">
+                        <User className="h-4 w-4" />
+                      </span>
+                      <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Admin management
                       </span>
                     </Button>
                     <Button
                       onClick={handleLogout}
-                      className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                      className="mt-1 grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
                     >
-                      <LogOut className="h-4 w-4" />
-                      <span className="text-sm font-semibold">Sign out</span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg">
+                        <LogOut className="h-4 w-4" />
+                      </span>
+                      <span className="truncate text-sm font-semibold">Sign out</span>
                     </Button>
                   </div>
                 </div>

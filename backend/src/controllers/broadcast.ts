@@ -342,12 +342,20 @@ export const deleteBroadcast = async (
       throw new NotFoundError("Broadcast not found");
     }
 
-    // Verify deletable state: only DRAFT
-    if (broadcast.status !== BroadcastStatus.DRAFT) {
-      throw new ConflictError("Only broadcasts in DRAFT status can be deleted");
+    const deletableStatuses: BroadcastStatus[] = [
+      BroadcastStatus.DRAFT,
+      BroadcastStatus.REJECTED,
+      BroadcastStatus.CANCELLED,
+      BroadcastStatus.FAILED,
+    ];
+
+    if (!deletableStatuses.includes(broadcast.status)) {
+      throw new ConflictError(
+        "Only draft, rejected, cancelled, or failed broadcasts can be deleted"
+      );
     }
 
-    // Verify OPERATOR ownership: can only delete their own drafts
+    // Verify OPERATOR ownership: can only delete their own broadcasts
     const isAdmin = adminRole === "SUPER_ADMIN" || adminRole === "ADMIN";
     if (!isAdmin && broadcast.createdById !== adminId) {
       throw new ConflictError("You do not have permission to delete this broadcast");
@@ -367,12 +375,13 @@ export const deleteBroadcast = async (
 
     logger.info(`Broadcast draft deleted: ID ${id} by Admin ID: ${adminId}`, {
       broadcastId: id,
+      status: broadcast.status,
       requestId: req.id as string,
     });
 
     res.status(200).json({
       success: true,
-      message: "Broadcast draft deleted successfully",
+      message: "Broadcast deleted successfully",
     });
   } catch (error) {
     next(error);
