@@ -15,6 +15,9 @@ enum SubscriberStatus {
 
 enum BroadcastStatus {
   DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
   QUEUED
   PROCESSING
   COMPLETED
@@ -40,76 +43,152 @@ enum AdminRole {
   VIEWER
 }
 
+enum BroadcastCategory {
+  EMERGENCY
+  SERVICE_UPDATE
+  REMINDER
+  ANNOUNCEMENT
+  OTHER
+}
+
+enum BroadcastSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BroadcastAudienceType {
+  ALL_ACTIVE_SUBSCRIBERS
+  GROUP
+}
+
 model Admin {
-  id           Int         @id @default(autoincrement())
-  name         String
-  email        String      @unique
-  passwordHash String      @map("password_hash")
-  role         AdminRole   @default(VIEWER)
-  isActive     Boolean     @default(true) @map("is_active")
-  broadcasts   Broadcast[]
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id                 Int                     @id @default(autoincrement())
+  name               String
+  email              String                  @unique
+  passwordHash       String                  @map("password_hash")
+  role               AdminRole               @default(VIEWER)
+  isActive           Boolean                 @default(true) @map("is_active")
+  createdBroadcasts  Broadcast[]             @relation("CreatedBroadcasts")
+  approvedBroadcasts Broadcast[]             @relation("ApprovedBroadcasts")
+  rejectedBroadcasts Broadcast[]             @relation("RejectedBroadcasts")
+  createdGroups      SubscriberGroup[]       @relation("CreatedGroups")
+  addedGroupMembers  SubscriberGroupMember[] @relation("AddedGroupMembers")
+  auditLogs          AuditLog[]
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
 
   @@map("admins")
 }
 
 model Subscriber {
-  id             Int              @id @default(autoincrement())
-  name           String?
-  phoneNumber    String           @unique @map("phone_number")
-  optedIn        Boolean          @default(true) @map("opted_in")
-  status         SubscriberStatus @default(ACTIVE)
-  optedInAt      DateTime?        @map("opted_in_at")
-  unsubscribedAt DateTime?        @map("unsubscribed_at")
-  messages       Message[]
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id               Int                     @id @default(autoincrement())
+  name             String?
+  phoneNumber      String                  @unique @map("phone_number")
+  optedIn          Boolean                 @default(true) @map("opted_in")
+  status           SubscriberStatus        @default(ACTIVE)
+  optedInAt        DateTime?               @map("opted_in_at")
+  unsubscribedAt   DateTime?               @map("unsubscribed_at")
+  messages         Message[]
+  groupMemberships SubscriberGroupMember[]
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
 
   @@index([status, optedIn])
   @@map("subscribers")
 }
 
+model SubscriberGroup {
+  id          Int                     @id @default(autoincrement())
+  name        String                  @unique
+  description String?                 @db.Text
+  createdById Int                     @map("created_by_id")
+  createdBy   Admin                   @relation("CreatedGroups", fields: [createdById], references: [id])
+  members     SubscriberGroupMember[]
+  broadcasts  Broadcast[]
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  @@map("subscriber_groups")
+}
+
+model SubscriberGroupMember {
+  id           Int             @id @default(autoincrement())
+  groupId      Int             @map("group_id")
+  subscriberId Int             @map("subscriber_id")
+  addedById    Int?            @map("added_by_id")
+  group        SubscriberGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subscriber   Subscriber      @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  addedBy      Admin?          @relation("AddedGroupMembers", fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([groupId, subscriberId])
+  @@index([groupId])
+  @@index([subscriberId])
+  @@map("subscriber_group_members")
+}
+
 model Broadcast {
-  id                Int             @id @default(autoincrement())
-  title             String
-  message           String          @db.Text
-  templateName      String?         @map("template_name")
-  status            BroadcastStatus @default(DRAFT)
-  totalRecipients   Int             @default(0) @map("total_recipients")
-  createdById       Int             @map("created_by_id")
-  createdBy         Admin           @relation(fields: [createdById], references: [id])
-  messages          Message[]
-  startedAt         DateTime?       @map("started_at")
-  completedAt       DateTime?       @map("completed_at")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+  id                 Int                   @id @default(autoincrement())
+  title              String
+  message            String                @db.Text
+  templateName       String?               @map("template_name")
+  category           BroadcastCategory     @default(ANNOUNCEMENT)
+  severity           BroadcastSeverity     @default(LOW)
+  audienceType       BroadcastAudienceType @default(ALL_ACTIVE_SUBSCRIBERS) @map("audience_type")
+  groupId            Int?                  @map("group_id")
+  group              SubscriberGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  status             BroadcastStatus       @default(DRAFT)
+  totalRecipients    Int                   @default(0) @map("total_recipients")
+  createdById        Int                   @map("created_by_id")
+  createdBy          Admin                 @relation("CreatedBroadcasts", fields: [createdById], references: [id])
+  approvedById       Int?                  @map("approved_by_id")
+  approvedBy         Admin?                @relation("ApprovedBroadcasts", fields: [approvedById], references: [id])
+  rejectedById       Int?                  @map("rejected_by_id")
+  rejectedBy         Admin?                @relation("RejectedBroadcasts", fields: [rejectedById], references: [id])
+  messages           Message[]
+  submittedAt        DateTime?             @map("submitted_at")
+  approvedAt         DateTime?             @map("approved_at")
+  rejectedAt         DateTime?             @map("rejected_at")
+  queuedAt           DateTime?             @map("queued_at")
+  cancelledAt        DateTime?             @map("cancelled_at")
+  startedAt          DateTime?             @map("started_at")
+  completedAt        DateTime?             @map("completed_at")
+  rejectionReason    String?               @db.Text @map("rejection_reason")
+  cancellationReason String?               @db.Text @map("cancellation_reason")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
 
   @@index([status])
+  @@index([createdById])
+  @@index([groupId])
+  @@index([createdAt])
   @@map("broadcasts")
 }
 
 model Message {
-  id                  Int           @id @default(autoincrement())
-  broadcastId         Int           @map("broadcast_id")
-  subscriberId        Int           @map("subscriber_id")
-  phoneNumber         String        @map("phone_number")
-  whatsappMessageId   String?       @unique @map("whatsapp_message_id")
-  status              MessageStatus @default(QUEUED)
-  errorCode           String?       @map("error_code")
-  errorMessage        String?       @db.Text @map("error_message")
-  retryCount          Int           @default(0) @map("retry_count")
-  submittedAt         DateTime?     @map("submitted_at")
-  sentAt              DateTime?     @map("sent_at")
-  deliveredAt         DateTime?     @map("delivered_at")
-  readAt              DateTime?     @map("read_at")
-  failedAt            DateTime?     @map("failed_at")
-  broadcast           Broadcast     @relation(fields: [broadcastId], references: [id])
-  subscriber          Subscriber    @relation(fields: [subscriberId], references: [id])
-  statusEvents        MessageStatusEvent[]
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+  id                Int                  @id @default(autoincrement())
+  broadcastId       Int                  @map("broadcast_id")
+  subscriberId      Int                  @map("subscriber_id")
+  phoneNumber       String               @map("phone_number")
+  whatsappMessageId String?              @unique @map("whatsapp_message_id")
+  status            MessageStatus        @default(QUEUED)
+  errorCode         String?              @map("error_code")
+  errorMessage      String?              @db.Text @map("error_message")
+  retryCount        Int                  @default(0) @map("retry_count")
+  submittedAt       DateTime?            @map("submitted_at")
+  sentAt            DateTime?            @map("sent_at")
+  deliveredAt       DateTime?            @map("delivered_at")
+  readAt            DateTime?            @map("read_at")
+  failedAt          DateTime?            @map("failed_at")
+  broadcast         Broadcast            @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  subscriber        Subscriber           @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  statusEvents      MessageStatusEvent[]
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
 
+  @@unique([broadcastId, subscriberId])
   @@index([status])
   @@index([broadcastId, status])
   @@map("messages")
@@ -121,9 +200,26 @@ model MessageStatusEvent {
   status         MessageStatus
   eventTimestamp DateTime      @map("event_timestamp")
   webhookPayload Json?         @map("webhook_payload")
-  message        Message       @relation(fields: [messageId], references: [id])
+  message        Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now()) @map("created_at")
 
   @@index([messageId, eventTimestamp])
   @@map("message_status_events")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int?     @map("admin_id")
+  admin      Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

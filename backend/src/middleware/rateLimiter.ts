@@ -10,7 +10,7 @@ interface RateLimitStore {
 const store: RateLimitStore = {};
 
 export const loginRateLimiter = (
-  windowMs: number = 15 * 60 * 1000, // 15 minutes
+  windowMs: number = 60 * 1000, // 60 seconds
   maxRequests: number = 5 // max 5 login requests per window
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {

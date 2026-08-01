@@ -7,9 +7,11 @@ import { Login } from "./pages/Login.js";
 import { SignUp } from "./pages/SignUp.js";
 import { Dashboard } from "./pages/Dashboard.js";
 import { Subscribers } from "./pages/Subscribers.js";
-import { AdminManagement } from "./pages/AdminManagement.js";
+import { Groups } from "./pages/Groups.js";
 import { Broadcasts } from "./pages/Broadcasts.js";
+import { BroadcastDetails } from "./pages/BroadcastDetails.js";
 import { Messages } from "./pages/Messages.js";
+import { AdminManagement } from "./pages/AdminManagement.js";
 import { Settings } from "./pages/Settings.js";
 import { Unauthorized } from "./pages/Unauthorized.js";
 import { NotFound } from "./pages/NotFound.js";
@@ -34,6 +36,16 @@ const App: React.FC = () => {
           >
             <Route index element={<Dashboard />} />
             <Route path="subscribers" element={<Subscribers />} />
+            
+            <Route
+              path="groups"
+              element={
+                <ProtectedRoute permission="groups.view">
+                  <Groups />
+                </ProtectedRoute>
+              }
+            />
+            
             <Route
               path="broadcasts"
               element={
@@ -42,6 +54,16 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+
+            <Route
+              path="broadcasts/:id"
+              element={
+                <ProtectedRoute permission="broadcasts.view">
+                  <BroadcastDetails />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="messages"
               element={
@@ -50,6 +72,7 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="admins"
               element={
@@ -58,6 +81,7 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+            
             <Route
               path="settings"
               element={
@@ -66,6 +90,7 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+
             <Route path="unauthorized" element={<Unauthorized />} />
             <Route path="*" element={<NotFound />} />
           </Route>

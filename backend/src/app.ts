@@ -5,10 +5,14 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { router as apiRouter } from "./routes/index.js";
+import { requestIdMiddleware } from "./middleware/requestId.js";
+import { logger } from "./config/logger.js";
 
 export const app = express();
 
-// Security and utility middleware
+// Generate request correlation ID early
+app.use(requestIdMiddleware);
+
 app.use(helmet());
 app.use(
   cors({
@@ -16,7 +20,25 @@ app.use(
     credentials: true,
   })
 );
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+// Stream Morgan logs directly to Winston logger
+const isProd = process.env.NODE_ENV === "production";
+const morganFormat = isProd
+  ? ':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" - :response-time ms'
+  : ":method :url :status :res[content-length] - :response-time ms";
+
+app.use(
+  morgan(morganFormat, {
+    // Skip health check logs to reduce noise
+    skip: (req) => req.originalUrl === "/api/health" || req.path === "/api/health",
+    stream: {
+      write: (message) => {
+        logger.http(message.trim());
+      },
+    },
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 

@@ -7,6 +7,7 @@ import type { Permission } from "../utils/permissions.js";
 import {
   LayoutDashboard,
   Users,
+  FolderOpen,
   UserCheck,
   Settings as SettingsIcon,
   LogOut,
@@ -76,6 +77,12 @@ export const Layout: React.FC = () => {
       path: "/subscribers",
       icon: Users,
       permission: "subscribers.view",
+    },
+    {
+      name: "Groups",
+      path: "/groups",
+      icon: FolderOpen,
+      permission: "groups.view",
     },
     {
       name: "Broadcasts",
