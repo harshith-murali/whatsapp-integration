@@ -31,7 +31,7 @@ export const getDashboardSummary = async (
       broadcastFilter.status = { not: BroadcastStatus.DRAFT };
     }
 
-    // Run parallel queries to gather stats
+    // Gather basic stats
     const [
       totalSubscribers,
       activeSubscribers,
@@ -41,16 +41,13 @@ export const getDashboardSummary = async (
       totalAdmins,
       activeAdmins,
       recentSubscribers,
-      // Phase 2 statistics
       totalBroadcasts,
       draftBroadcasts,
       pendingApprovalBroadcasts,
       approvedBroadcasts,
       queuedBroadcasts,
       cancelledBroadcasts,
-      queuedMessages,
       recentBroadcasts,
-      // Operator specific drafts
       myDrafts,
       myPendingApprovalBroadcasts,
     ] = await Promise.all([
@@ -76,14 +73,14 @@ export const getDashboardSummary = async (
           createdAt: true,
         },
       }),
-      prisma.broadcast.count(isOperator ? { where: { createdById: adminId } } : undefined),
-      prisma.broadcast.count({ where: { status: BroadcastStatus.DRAFT } }),
-      prisma.broadcast.count({ where: { status: BroadcastStatus.PENDING_APPROVAL } }),
-      prisma.broadcast.count({ where: { status: BroadcastStatus.APPROVED } }),
-      prisma.broadcast.count({ where: { status: BroadcastStatus.QUEUED } }),
-      prisma.broadcast.count({ where: { status: BroadcastStatus.CANCELLED } }),
-      prisma.message.count({ where: { status: MessageStatus.QUEUED } }),
-      // Recent Broadcasts list (up to 5)
+      // Broadcast stats (if Admin or Super Admin)
+      isAdmin ? prisma.broadcast.count() : Promise.resolve(0),
+      isAdmin ? prisma.broadcast.count({ where: { status: BroadcastStatus.DRAFT } }) : Promise.resolve(0),
+      isAdmin ? prisma.broadcast.count({ where: { status: BroadcastStatus.PENDING_APPROVAL } }) : Promise.resolve(0),
+      isAdmin ? prisma.broadcast.count({ where: { status: BroadcastStatus.APPROVED } }) : Promise.resolve(0),
+      isAdmin ? prisma.broadcast.count({ where: { status: BroadcastStatus.QUEUED } }) : Promise.resolve(0),
+      isAdmin ? prisma.broadcast.count({ where: { status: BroadcastStatus.CANCELLED } }) : Promise.resolve(0),
+      // Recent Broadcasts
       prisma.broadcast.findMany({
         where: broadcastFilter,
         orderBy: { createdAt: "desc" },
@@ -93,7 +90,7 @@ export const getDashboardSummary = async (
           group: { select: { name: true } },
         },
       }),
-      // Operator counts
+      // Operator specific drafts
       isOperator ? prisma.broadcast.count({ where: { createdById: adminId, status: BroadcastStatus.DRAFT } }) : Promise.resolve(null),
       isOperator ? prisma.broadcast.count({ where: { createdById: adminId, status: BroadcastStatus.PENDING_APPROVAL } }) : Promise.resolve(null),
     ]);
@@ -117,37 +114,140 @@ export const getDashboardSummary = async (
       recentSubscribers: formattedRecentSubscribers,
     };
 
-    if (adminRole === AdminRole.SUPER_ADMIN) {
+    if (isAdmin) {
+      // 1. Gather Phase 3 message metrics
+      const [
+        queuedMessages,
+        processingMessages,
+        submittedMessages,
+        failedMessages,
+        waitingRetryMessages,
+        activeWorkersCount,
+        recentFailuresRaw,
+        activeBroadcastsRaw,
+      ] = await Promise.all([
+        prisma.message.count({ where: { status: MessageStatus.QUEUED } }),
+        prisma.message.count({ where: { status: MessageStatus.PROCESSING } }),
+        prisma.message.count({ where: { status: MessageStatus.SUBMITTED } }),
+        prisma.message.count({ where: { status: MessageStatus.FAILED } }),
+        prisma.message.count({ where: { status: MessageStatus.QUEUED, retryCount: { gt: 0 } } }),
+        prisma.workerHeartbeat.count({ where: { lastHeartbeatAt: { gte: new Date(Date.now() - 15000) } } }),
+        prisma.message.findMany({
+          where: { status: MessageStatus.FAILED },
+          orderBy: { failedAt: "desc" },
+          take: 5,
+          include: {
+            subscriber: { select: { name: true, phoneNumber: true } },
+            broadcast: { select: { title: true } },
+          },
+        }),
+        prisma.broadcast.findMany({
+          where: { status: { in: [BroadcastStatus.QUEUED, BroadcastStatus.PROCESSING] } },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            totalRecipients: true,
+            messages: { select: { status: true } },
+          },
+        }),
+      ]);
+
+      const recentFailures = recentFailuresRaw.map((f) => ({
+        id: f.id,
+        broadcastId: f.broadcastId,
+        broadcastTitle: f.broadcast.title,
+        subscriberName: f.subscriber.name,
+        phoneNumber: maskPhone(f.subscriber.phoneNumber),
+        failedAt: f.failedAt,
+        errorCode: f.errorCode,
+        errorMessage: f.errorMessage,
+      }));
+
+      const broadcastProcessingSummary = activeBroadcastsRaw.map((b) => {
+        const counts = { QUEUED: 0, PROCESSING: 0, SUBMITTED: 0, FAILED: 0, CANCELLED: 0 };
+        for (const m of b.messages) {
+          if (counts[m.status as keyof typeof counts] !== undefined) {
+            counts[m.status as keyof typeof counts]++;
+          }
+        }
+        return {
+          id: b.id,
+          title: b.title,
+          status: b.status,
+          totalRecipients: b.totalRecipients,
+          ...counts,
+        };
+      });
+
       responseData = {
         ...responseData,
-        totalAdmins,
-        activeAdmins,
         totalBroadcasts,
         draftBroadcasts,
         pendingApprovalBroadcasts,
         approvedBroadcasts,
         queuedBroadcasts,
         cancelledBroadcasts,
-        queuedMessages,
         recentBroadcasts,
-      };
-    } else if (adminRole === AdminRole.ADMIN) {
-      responseData = {
-        ...responseData,
-        totalBroadcasts,
-        draftBroadcasts,
-        pendingApprovalBroadcasts,
-        approvedBroadcasts,
-        queuedBroadcasts,
-        cancelledBroadcasts,
+        // Phase 3 Metrics
         queuedMessages,
-        recentBroadcasts,
+        processingMessages,
+        submittedMessages,
+        failedMessages,
+        waitingRetryMessages,
+        activeWorkers: activeWorkersCount,
+        recentFailures,
+        broadcastProcessingSummary,
       };
-    } else if (adminRole === AdminRole.OPERATOR) {
+
+      if (isSuperAdmin) {
+        responseData.totalAdmins = totalAdmins;
+        responseData.activeAdmins = activeAdmins;
+      }
+    } else if (isOperator) {
+      // Operator stats
+      const [
+        mySubmittedMessages,
+        myFailedMessages,
+        myBroadcastsProgressRaw,
+      ] = await Promise.all([
+        prisma.message.count({ where: { status: MessageStatus.SUBMITTED, broadcast: { createdById: adminId } } }),
+        prisma.message.count({ where: { status: MessageStatus.FAILED, broadcast: { createdById: adminId } } }),
+        prisma.broadcast.findMany({
+          where: { createdById: adminId, status: { in: [BroadcastStatus.QUEUED, BroadcastStatus.PROCESSING] } },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            totalRecipients: true,
+            messages: { select: { status: true } },
+          },
+        }),
+      ]);
+
+      const myBroadcastsProgress = myBroadcastsProgressRaw.map((b) => {
+        const counts = { QUEUED: 0, PROCESSING: 0, SUBMITTED: 0, FAILED: 0, CANCELLED: 0 };
+        for (const m of b.messages) {
+          if (counts[m.status as keyof typeof counts] !== undefined) {
+            counts[m.status as keyof typeof counts]++;
+          }
+        }
+        return {
+          id: b.id,
+          title: b.title,
+          status: b.status,
+          totalRecipients: b.totalRecipients,
+          ...counts,
+        };
+      });
+
       responseData = {
         ...responseData,
         myDrafts,
         myPendingApprovalBroadcasts,
+        mySubmittedMessages,
+        myFailedMessages,
+        myBroadcastsProgress,
       };
     }
 

@@ -22,6 +22,7 @@ enum BroadcastStatus {
   PROCESSING
   COMPLETED
   PARTIALLY_FAILED
+  FAILED
   CANCELLED
 }
 
@@ -61,6 +62,14 @@ enum BroadcastSeverity {
 enum BroadcastAudienceType {
   ALL_ACTIVE_SUBSCRIBERS
   GROUP
+}
+
+enum WorkerStatus {
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  ERROR
 }
 
 model Admin {
@@ -154,7 +163,9 @@ model Broadcast {
   queuedAt           DateTime?             @map("queued_at")
   cancelledAt        DateTime?             @map("cancelled_at")
   startedAt          DateTime?             @map("started_at")
+  processingStartedAt DateTime?            @map("processing_started_at")
   completedAt        DateTime?             @map("completed_at")
+  failedAt           DateTime?             @map("failed_at")
   rejectionReason    String?               @db.Text @map("rejection_reason")
   cancellationReason String?               @db.Text @map("cancellation_reason")
   createdAt          DateTime              @default(now()) @map("created_at")
@@ -168,29 +179,39 @@ model Broadcast {
 }
 
 model Message {
-  id                Int                  @id @default(autoincrement())
-  broadcastId       Int                  @map("broadcast_id")
-  subscriberId      Int                  @map("subscriber_id")
-  phoneNumber       String               @map("phone_number")
-  whatsappMessageId String?              @unique @map("whatsapp_message_id")
-  status            MessageStatus        @default(QUEUED)
-  errorCode         String?              @map("error_code")
-  errorMessage      String?              @db.Text @map("error_message")
-  retryCount        Int                  @default(0) @map("retry_count")
-  submittedAt       DateTime?            @map("submitted_at")
-  sentAt            DateTime?            @map("sent_at")
-  deliveredAt       DateTime?            @map("delivered_at")
-  readAt            DateTime?            @map("read_at")
-  failedAt          DateTime?            @map("failed_at")
-  broadcast         Broadcast            @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
-  subscriber        Subscriber           @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
-  statusEvents      MessageStatusEvent[]
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
+  id                  Int                  @id @default(autoincrement())
+  broadcastId         Int                  @map("broadcast_id")
+  subscriberId        Int                  @map("subscriber_id")
+  phoneNumber         String               @map("phone_number")
+  whatsappMessageId   String?              @unique @map("whatsapp_message_id")
+  status              MessageStatus        @default(QUEUED)
+  errorCode           String?              @map("error_code")
+  errorMessage        String?              @db.Text @map("error_message")
+  retryCount          Int                  @default(0) @map("retry_count")
+  maxRetries          Int                  @default(3) @map("max_retries")
+  nextRetryAt         DateTime?            @map("next_retry_at")
+  lastAttemptAt       DateTime?            @map("last_attempt_at")
+  processingStartedAt DateTime?            @map("processing_started_at")
+  submittedAt         DateTime?            @map("submitted_at")
+  failedAt            DateTime?            @map("failed_at")
+  cancelledAt         DateTime?            @map("cancelled_at")
+  providerMessageId   String?              @unique @map("provider_message_id")
+  providerName        String?              @map("provider_name")
+  workerId            String?              @map("worker_id")
+  claimToken          String?              @map("claim_token")
+  claimExpiresAt      DateTime?            @map("claim_expires_at")
+  broadcast           Broadcast            @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  subscriber          Subscriber           @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  statusEvents        MessageStatusEvent[]
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   @@unique([broadcastId, subscriberId])
   @@index([status])
   @@index([broadcastId, status])
+  @@index([nextRetryAt])
+  @@index([claimExpiresAt])
+  @@index([createdAt])
   @@map("messages")
 }
 
@@ -198,7 +219,11 @@ model MessageStatusEvent {
   id             Int           @id @default(autoincrement())
   messageId      Int           @map("message_id")
   status         MessageStatus
-  eventTimestamp DateTime      @map("event_timestamp")
+  previousStatus MessageStatus? @map("previous_status")
+  workerId       String?       @map("worker_id")
+  errorCode      String?       @map("error_code")
+  metadata       Json?
+  eventTimestamp DateTime      @default(now()) @map("event_timestamp")
   webhookPayload Json?         @map("webhook_payload")
   message        Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now()) @map("created_at")
@@ -222,4 +247,23 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model WorkerHeartbeat {
+  id               Int          @id @default(autoincrement())
+  workerId         String       @unique @map("worker_id")
+  providerName     String       @map("provider_name")
+  status           WorkerStatus @default(STARTING)
+  startedAt        DateTime     @default(now()) @map("started_at")
+  lastHeartbeatAt  DateTime     @default(now()) @map("last_heartbeat_at")
+  currentBatchSize Int          @default(0) @map("current_batch_size")
+  processedCount   Int          @default(0) @map("processed_count")
+  successCount     Int          @default(0) @map("success_count")
+  failedCount      Int          @default(0) @map("failed_count")
+  hostname         String?
+  processId        Int?         @map("process_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("worker_heartbeats")
 }

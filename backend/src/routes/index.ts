@@ -7,6 +7,7 @@ import { router as groupRouter } from "./group.js";
 import { router as broadcastRouter } from "./broadcast.js";
 import { router as messageRouter } from "./message.js";
 import { router as auditLogRouter } from "./auditLog.js";
+import { router as workerRouter } from "./worker.js";
 
 export const router = Router();
 
@@ -18,3 +19,4 @@ router.use("/groups", groupRouter);
 router.use("/broadcasts", broadcastRouter);
 router.use("/messages", messageRouter);
 router.use("/audit-logs", auditLogRouter);
+router.use("/workers", workerRouter);

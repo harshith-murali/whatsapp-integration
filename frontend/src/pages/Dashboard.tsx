@@ -17,6 +17,8 @@ import {
   ThumbsUp,
   PlaySquare,
   ArrowRight,
+  AlertCircle,
+  Cpu,
 } from "lucide-react";
 
 interface DashboardData {
@@ -27,14 +29,14 @@ interface DashboardData {
   unsubscribedSubscribers: number;
   blockedSubscribers: number;
   optedInSubscribers: number;
-  // Phase 2 statistics (optional under strict least-privilege)
+  
+  // Broadcast stats
   totalBroadcasts?: number;
   draftBroadcasts?: number;
   pendingApprovalBroadcasts?: number;
   approvedBroadcasts?: number;
   queuedBroadcasts?: number;
   cancelledBroadcasts?: number;
-  queuedMessages?: number;
   recentBroadcasts?: Array<{
     id: number;
     title: string;
@@ -54,8 +56,52 @@ interface DashboardData {
     optedIn: boolean;
     createdAt: string;
   }>;
+
+  // Phase 3 stats additions (Admin/Super Admin)
+  queuedMessages?: number;
+  processingMessages?: number;
+  submittedMessages?: number;
+  failedMessages?: number;
+  waitingRetryMessages?: number;
+  activeWorkers?: number;
+  recentFailures?: Array<{
+    id: number;
+    broadcastId: number;
+    broadcastTitle: string;
+    subscriberName: string | null;
+    phoneNumber: string;
+    failedAt: string;
+    errorCode: string;
+    errorMessage: string;
+  }>;
+  broadcastProcessingSummary?: Array<{
+    id: number;
+    title: string;
+    status: string;
+    totalRecipients: number;
+    QUEUED: number;
+    PROCESSING: number;
+    SUBMITTED: number;
+    FAILED: number;
+    CANCELLED: number;
+  }>;
+
+  // Operator specific counts
   myDrafts?: number | null;
   myPendingApprovalBroadcasts?: number | null;
+  mySubmittedMessages?: number;
+  myFailedMessages?: number;
+  myBroadcastsProgress?: Array<{
+    id: number;
+    title: string;
+    status: string;
+    totalRecipients: number;
+    QUEUED: number;
+    PROCESSING: number;
+    SUBMITTED: number;
+    FAILED: number;
+    CANCELLED: number;
+  }>;
 }
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -82,22 +128,54 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/dashboard/summary");
-        if (response.data?.success) {
-          setData(response.data.data);
-        }
-      } catch (err: unknown) {
-        setError(getErrorMessage(err, "Failed to load dashboard metrics."));
-      } finally {
-        setLoading(false);
+  const fetchSummary = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const response = await api.get("/dashboard/summary");
+      if (response.data?.success) {
+        setData(response.data.data);
       }
-    };
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load dashboard metrics."));
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchSummary();
   }, []);
+
+  // Polling loop: poll dashboard every 5s if there is active queuing/processing going on
+  useEffect(() => {
+    if (!data) return;
+
+    const hasActiveProcessing =
+      (data.broadcastProcessingSummary && data.broadcastProcessingSummary.length > 0) ||
+      (data.myBroadcastsProgress && data.myBroadcastsProgress.length > 0) ||
+      (data.processingMessages && data.processingMessages > 0);
+
+    if (!hasActiveProcessing) return;
+
+    let intervalId: any;
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(intervalId);
+      } else {
+        clearInterval(intervalId);
+        intervalId = setInterval(() => fetchSummary(true), 5000);
+      }
+    };
+
+    intervalId = setInterval(() => fetchSummary(true), 5000);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [data]);
 
   if (loading) {
     return (
@@ -117,6 +195,7 @@ export const Dashboard: React.FC = () => {
   }
 
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+  const isOperator = admin?.role === "OPERATOR";
 
   // Widget segment visibility flags driven by permissions
   const canViewAdmins = hasPermission(admin?.role, "admins.view");
@@ -136,18 +215,28 @@ export const Dashboard: React.FC = () => {
 
   // Core broadcast campaign stats (Visible to SUPER_ADMIN, ADMIN)
   const bcMetrics = [
-    { name: "Total Broadcasts", value: (data.totalBroadcasts ?? 0).toLocaleString(), icon: Megaphone },
+    { name: "Total Campaigns", value: (data.totalBroadcasts ?? 0).toLocaleString(), icon: Megaphone },
     { name: "Drafts", value: (data.draftBroadcasts ?? 0).toLocaleString(), icon: Inbox },
-    { name: "Pending Review", value: (data.pendingApprovalBroadcasts ?? 0).toLocaleString(), icon: Clock },
+    { name: "Pending Approval", value: (data.pendingApprovalBroadcasts ?? 0).toLocaleString(), icon: Clock },
     { name: "Approved", value: (data.approvedBroadcasts ?? 0).toLocaleString(), icon: ThumbsUp },
-    { name: "Queued Broadcasts", value: (data.queuedBroadcasts ?? 0).toLocaleString(), icon: PlaySquare },
+  ];
+
+  // Phase 3 Delivery stats (Visible to SUPER_ADMIN, ADMIN)
+  const engineMetrics = [
     { name: "Queued Messages", value: (data.queuedMessages ?? 0).toLocaleString(), icon: MessageSquareIcon },
+    { name: "Processing Messages", value: (data.processingMessages ?? 0).toLocaleString(), icon: PlaySquare, isPulse: (data.processingMessages ?? 0) > 0 },
+    { name: "Submitted Messages", value: (data.submittedMessages ?? 0).toLocaleString(), icon: ThumbsUp },
+    { name: "Failed Messages", value: (data.failedMessages ?? 0).toLocaleString(), icon: AlertCircle, isAlert: (data.failedMessages ?? 0) > 0 },
+    { name: "Retry Queue", value: (data.waitingRetryMessages ?? 0).toLocaleString(), icon: Clock },
+    { name: "Active Workers", value: (data.activeWorkers ?? 0).toLocaleString(), icon: Cpu, isGreen: (data.activeWorkers ?? 0) > 0 },
   ];
 
   // Operator-specific metrics (Visible to OPERATOR only)
   const opMetrics = [
     { name: "My Drafts", value: (data.myDrafts ?? 0).toLocaleString(), icon: Inbox },
     { name: "My Pending Approval", value: (data.myPendingApprovalBroadcasts ?? 0).toLocaleString(), icon: Clock },
+    { name: "My Submitted Messages", value: (data.mySubmittedMessages ?? 0).toLocaleString(), icon: ThumbsUp },
+    { name: "My Failed Messages", value: (data.myFailedMessages ?? 0).toLocaleString(), icon: AlertCircle, isAlert: (data.myFailedMessages ?? 0) > 0 },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -159,9 +248,17 @@ export const Dashboard: React.FC = () => {
       case "APPROVED":
         return "bg-indigo-50 text-indigo-750 border-indigo-200";
       case "QUEUED":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        return "bg-cyan-50 text-cyan-700 border-cyan-200";
+      case "PROCESSING":
+        return "bg-blue-50 text-blue-700 border-blue-200 animate-pulse";
+      case "COMPLETED":
+        return "bg-emerald-50 text-emerald-700 border-emerald-250";
+      case "PARTIALLY_FAILED":
+        return "bg-orange-50 text-orange-750 border-orange-200";
+      case "FAILED":
+        return "bg-rose-50 text-rose-700 border-rose-250";
       case "CANCELLED":
-        return "bg-red-50 text-red-700 border-red-200";
+        return "bg-slate-100 text-slate-655 border-slate-200";
       default:
         return "bg-slate-50 text-slate-600";
     }
@@ -191,7 +288,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Subscriber Statistics section */}
       <div>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Subscriber Metrics</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">Subscriber Metrics</h3>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {subMetrics.map((metric) => {
             const Icon = metric.icon;
@@ -213,11 +310,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Campaign & Queues section (ADMIN, SUPER_ADMIN) */}
+      {/* Campaign Statistics section (ADMIN, SUPER_ADMIN) */}
       {canViewBroadcastMetrics && (
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Broadcast Campaigns & Queues</h3>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">Campaign Statistics</h3>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {bcMetrics.map((metric) => {
               const Icon = metric.icon;
               return (
@@ -225,7 +322,39 @@ export const Dashboard: React.FC = () => {
                   key={metric.name}
                   className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-350">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-655 dark:bg-indigo-950/30 dark:text-indigo-350">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="mt-4">
+                    <span className="text-xs text-slate-455 dark:text-slate-500 font-semibold block">{metric.name}</span>
+                    <strong className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block font-mono">{metric.value}</strong>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Queue & Worker Engine status section (ADMIN, SUPER_ADMIN) */}
+      {canViewBroadcastMetrics && (
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-455 mb-3">Live Queue & Worker Engine</h3>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {engineMetrics.map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <div
+                  key={metric.name}
+                  className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
+                >
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                    metric.isAlert
+                      ? "bg-rose-50 text-rose-650 dark:bg-rose-950/30 dark:text-rose-400"
+                      : metric.isGreen
+                      ? "bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-400"
+                      : "bg-indigo-50 text-indigo-650 dark:bg-indigo-950/30 dark:text-indigo-350"
+                  } ${metric.isPulse ? "animate-pulse" : ""}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="mt-4">
@@ -242,8 +371,8 @@ export const Dashboard: React.FC = () => {
       {/* Operator Workload stats section (OPERATOR) */}
       {canViewOperatorMetrics && (
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">My Workspace Statistics</h3>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-450 mb-3">My Workspace Statistics</h3>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {opMetrics.map((metric) => {
               const Icon = metric.icon;
               return (
@@ -251,7 +380,11 @@ export const Dashboard: React.FC = () => {
                   key={metric.name}
                   className="flex flex-col justify-between rounded-lg border border-white/80 bg-white/95 p-5 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/90"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-350">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                    metric.isAlert
+                      ? "bg-rose-50 text-rose-650 dark:bg-rose-950/30"
+                      : "bg-emerald-50 text-emerald-650 dark:bg-emerald-950/30 dark:text-emerald-350"
+                  }`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="mt-4">
@@ -265,10 +398,46 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Active Broadcast Progress lists (Admin/Super Admin & Operator) */}
+      {((data.broadcastProcessingSummary && data.broadcastProcessingSummary.length > 0) ||
+        (data.myBroadcastsProgress && data.myBroadcastsProgress.length > 0)) && (
+        <div className="rounded-lg border border-white/80 bg-white/95 p-6 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/95">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-slate-450 mb-4 pb-2 border-b border-tail-border dark:border-tail-dark-border">
+            Active Campaign Queue Progress
+          </h3>
+          <div className="space-y-5">
+            {(isOperator ? data.myBroadcastsProgress : data.broadcastProcessingSummary)!.map((b) => {
+              const completed = b.SUBMITTED + b.FAILED + b.CANCELLED;
+              const percent = b.totalRecipients > 0 ? Math.round((completed / b.totalRecipients) * 100) : 0;
+              return (
+                <div key={b.id} className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <Link to={`/broadcasts/${b.id}`} className="font-bold text-slate-900 dark:text-white hover:underline">
+                        {b.title} (#{b.id})
+                      </Link>
+                      <span className={`ml-2.5 inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusBadge(b.status)}`}>
+                        {b.status}
+                      </span>
+                    </div>
+                    <span className="font-mono text-slate-500">
+                      {completed} / {b.totalRecipients} ({percent}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300" style={{ width: `${percent}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions (only visible to role permission groups) */}
       {canViewQuickActions && (
         <div className="rounded-lg border border-white/80 bg-white/95 p-6 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/95">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-tail-border dark:border-tail-dark-border">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-slate-450 mb-4 pb-2 border-b border-tail-border dark:border-tail-dark-border">
             Quick Actions
           </h3>
           <div className="flex flex-wrap gap-4">
@@ -313,59 +482,96 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Grid: Recent Broadcasts + Recent Subscribers list (Clean reflow grid columns) */}
+      {/* Grid: Recent Campaigns / Failures + Recent Subscribers list */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Broadcasts - Hidden entirely for OPERATOR and VIEWER roles */}
         {canViewRecentCampaigns && data.recentBroadcasts !== undefined && (
-          <div className="lg:col-span-2 overflow-hidden rounded-lg border border-white/80 bg-white/95 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/95">
-            <div className="border-b border-tail-border/70 px-5 py-4 dark:border-tail-dark-border/70 flex justify-between items-center">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-slate-400">
-                Recent Campaigns
-              </h3>
-              <Link to="/broadcasts" className="text-xs font-bold text-indigo-650 hover:underline">
-                View All
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-455 uppercase font-semibold border-b border-tail-border dark:border-tail-dark-border">
-                    <th className="px-5 py-3">Title</th>
-                    <th className="px-5 py-3">Audience</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-tail-border dark:divide-tail-dark-border">
-                  {data.recentBroadcasts.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic">No campaigns found.</td>
+          <div className="lg:col-span-2 space-y-6">
+            {/* Recent Campaigns table */}
+            <div className="overflow-hidden rounded-lg border border-white/80 bg-white/95 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/95">
+              <div className="border-b border-tail-border/70 px-5 py-4 dark:border-tail-dark-border/70 flex justify-between items-center">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-slate-450">
+                  Recent Campaigns
+                </h3>
+                <Link to="/broadcasts" className="text-xs font-bold text-indigo-650 hover:underline">
+                  View All
+                </Link>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-455 uppercase font-semibold border-b border-tail-border dark:border-tail-dark-border">
+                      <th className="px-5 py-3">Title</th>
+                      <th className="px-5 py-3">Audience</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3 text-right">Date</th>
                     </tr>
-                  ) : (
-                    data.recentBroadcasts.map((bc) => (
-                      <tr key={bc.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
-                        <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">
-                          <Link to={`/broadcasts/${bc.id}`} className="hover:text-indigo-650 hover:underline">
-                            {bc.title}
-                          </Link>
-                        </td>
-                        <td className="px-5 py-4 text-slate-550">
-                          {bc.audienceType === "GROUP" ? `Group: ${bc.group?.name}` : "All Active Subscribers"}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase ${getStatusBadge(bc.status)}`}>
-                            {bc.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right text-slate-400">
-                          {new Date(bc.createdAt).toLocaleDateString()}
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-tail-border dark:divide-tail-dark-border">
+                    {data.recentBroadcasts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic">No campaigns found.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      data.recentBroadcasts.map((bc) => (
+                        <tr key={bc.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                          <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">
+                            <Link to={`/broadcasts/${bc.id}`} className="hover:text-indigo-650 hover:underline">
+                              {bc.title}
+                            </Link>
+                          </td>
+                          <td className="px-5 py-4 text-slate-550">
+                            {bc.audienceType === "GROUP" ? `Group: ${bc.group?.name}` : "All Active Subscribers"}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase ${getStatusBadge(bc.status)}`}>
+                              {bc.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right text-slate-400">
+                            {new Date(bc.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Recent Processing Failures list */}
+            {data.recentFailures && data.recentFailures.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-white/80 bg-white/95 shadow-xs dark:border-tail-dark-border/70 dark:bg-tail-dark-card/95">
+                <div className="border-b border-tail-border/70 px-5 py-4 dark:border-tail-dark-border/70 flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-slate-950 dark:text-white uppercase tracking-wider text-rose-600">
+                    Recent Processing Failures
+                  </h3>
+                  <Link to="/messages?status=FAILED" className="text-xs font-bold text-rose-600 hover:underline">
+                    View Queue Logs
+                  </Link>
+                </div>
+                <div className="p-4 space-y-3 text-xs">
+                  {data.recentFailures.map((fail) => (
+                    <div key={fail.id} className="flex justify-between items-start p-3 bg-rose-50/50 dark:bg-rose-950/10 rounded border border-rose-100/70 dark:border-rose-900/30">
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200">
+                          {fail.subscriberName || "Subscriber"} ({fail.phoneNumber})
+                        </div>
+                        <div className="text-slate-450 mt-0.5">
+                          Campaign: <span className="font-semibold">{fail.broadcastTitle}</span>
+                        </div>
+                        <div className="text-rose-600/90 font-mono text-[10px] mt-1">
+                          {fail.errorCode}: {fail.errorMessage}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                        {new Date(fail.failedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

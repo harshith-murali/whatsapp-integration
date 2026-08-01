@@ -133,9 +133,27 @@ export const getBroadcastById = async (
       throw new NotFoundError("Broadcast not found"); // Block operator from viewing others' drafts
     }
 
+    // Calculate message counts by status for delivery progress tracking
+    const messageStats = { QUEUED: 0, PROCESSING: 0, SUBMITTED: 0, FAILED: 0, CANCELLED: 0 };
+    const aggregates = await prisma.message.groupBy({
+      by: ["status"],
+      where: { broadcastId: id },
+      _count: { id: true },
+    });
+
+    for (const group of aggregates) {
+      const key = group.status as keyof typeof messageStats;
+      if (messageStats[key] !== undefined) {
+        messageStats[key] = group._count.id;
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: broadcast,
+      data: {
+        ...broadcast,
+        messageStats,
+      },
     });
   } catch (error) {
     next(error);
@@ -832,13 +850,17 @@ export const cancelBroadcast = async (
         throw new NotFoundError("Broadcast not found");
       }
 
-      // Cancellation allowed for APPROVED and QUEUED statuses
-      if (broadcast.status !== BroadcastStatus.APPROVED && broadcast.status !== BroadcastStatus.QUEUED) {
-        throw new ConflictError("Only APPROVED or QUEUED broadcasts can be cancelled");
+      // Cancellation allowed for APPROVED, QUEUED, and PROCESSING statuses
+      if (
+        broadcast.status !== BroadcastStatus.APPROVED &&
+        broadcast.status !== BroadcastStatus.QUEUED &&
+        broadcast.status !== BroadcastStatus.PROCESSING
+      ) {
+        throw new ConflictError("Only APPROVED, QUEUED, or PROCESSING broadcasts can be cancelled");
       }
 
-      // If QUEUED, update remaining messages to CANCELLED
-      if (broadcast.status === BroadcastStatus.QUEUED) {
+      // If QUEUED or PROCESSING, update remaining QUEUED messages to CANCELLED
+      if (broadcast.status === BroadcastStatus.QUEUED || broadcast.status === BroadcastStatus.PROCESSING) {
         await tx.message.updateMany({
           where: {
             broadcastId: id,
@@ -846,6 +868,7 @@ export const cancelBroadcast = async (
           },
           data: {
             status: MessageStatus.CANCELLED,
+            cancelledAt: new Date(),
           },
         });
       }
@@ -886,3 +909,105 @@ export const cancelBroadcast = async (
     next(error);
   }
 };
+
+export const requeueFailedBroadcast = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      throw new BadRequestError("Invalid broadcast ID");
+    }
+
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      throw new BadRequestError("Authenticated administrator required");
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const broadcast = await tx.broadcast.findUnique({
+        where: { id },
+      });
+
+      if (!broadcast) {
+        throw new NotFoundError("Broadcast not found");
+      }
+
+      const terminalStatuses: string[] = [
+        BroadcastStatus.COMPLETED,
+        BroadcastStatus.PARTIALLY_FAILED,
+        BroadcastStatus.FAILED,
+      ];
+
+      if (!terminalStatuses.includes(broadcast.status as string)) {
+        throw new BadRequestError("Only completed or failed/partially-failed broadcasts can have messages requeued");
+      }
+
+      // Check if there are any failed messages
+      const failedCount = await tx.message.count({
+        where: { broadcastId: id, status: MessageStatus.FAILED },
+      });
+
+      if (failedCount === 0) {
+        throw new BadRequestError("No FAILED messages found in this broadcast to requeue");
+      }
+
+      // Update failed messages to QUEUED status
+      await tx.message.updateMany({
+        where: {
+          broadcastId: id,
+          status: MessageStatus.FAILED,
+        },
+        data: {
+          status: MessageStatus.QUEUED,
+          retryCount: 0,
+          errorCode: null,
+          errorMessage: null,
+          failedAt: null,
+          nextRetryAt: null,
+          lastAttemptAt: null,
+        },
+      });
+
+      // Update broadcast status to PROCESSING (or QUEUED if it was entirely reset)
+      const updated = await tx.broadcast.update({
+        where: { id },
+        data: {
+          status: BroadcastStatus.PROCESSING,
+          completedAt: null,
+          failedAt: null,
+        },
+      });
+
+      // Create Audit Log
+      await tx.auditLog.create({
+        data: {
+          adminId,
+          action: "BROADCAST_FAILED_MESSAGES_REQUEUED",
+          entityType: "Broadcast",
+          entityId: id,
+          metadata: { requeuedCount: failedCount },
+        },
+      });
+
+      return { updated, failedCount };
+    });
+
+    logger.info(`Requeued ${result.failedCount} failed messages for broadcast ID: ${id} by Admin ID: ${adminId}`, {
+      broadcastId: id,
+      requeuedCount: result.failedCount,
+      adminId,
+      requestId: req.id as string,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result.updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

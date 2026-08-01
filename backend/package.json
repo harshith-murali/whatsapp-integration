@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "worker:dev": "tsx watch src/workers/message.worker.ts",
+    "worker:start": "node dist/workers/message.worker.js"
   },
   "keywords": [],
   "author": "",

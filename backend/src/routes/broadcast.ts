@@ -13,6 +13,7 @@ import {
   getRecipientPreview,
   queueBroadcast,
   cancelBroadcast,
+  requeueFailedBroadcast,
 } from "../controllers/broadcast.js";
 import { getBroadcastMessages } from "../controllers/message.js";
 
@@ -89,6 +90,12 @@ router.post(
   "/:id/cancel",
   authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
   cancelBroadcast
+);
+
+router.post(
+  "/:id/requeue-failed",
+  authorize(AdminRole.SUPER_ADMIN, AdminRole.ADMIN),
+  requeueFailedBroadcast
 );
 
 // Related messages logs sub-route

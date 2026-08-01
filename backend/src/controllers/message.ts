@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../config/prisma.js";
 import { BadRequestError, NotFoundError } from "../utils/errors.js";
+import { logger } from "../config/logger.js";
 
 const isViewer = (role: string | undefined) => role === "VIEWER";
 
@@ -26,6 +27,10 @@ export const getMessages = async (
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
     
+    const hasError = req.query.hasError === "true";
+    const retryable = req.query.retryable === "true";
+    const nextRetryBefore = req.query.nextRetryBefore as string | undefined;
+
     const sortBy = (req.query.sortBy as string) || "createdAt";
     const sortOrder = (req.query.sortOrder as "asc" | "desc") || "desc";
 
@@ -39,6 +44,20 @@ export const getMessages = async (
     }
     if (status) {
       where.status = status;
+    }
+
+    if (hasError) {
+      where.errorCode = { not: null };
+    }
+
+    if (retryable) {
+      where.status = { in: ["QUEUED", "FAILED"] };
+      where.retryCount = { lt: prisma.message.fields.maxRetries }; // Or dynamically using maxRetries check in code, let's keep it where check simpler or filter below. Let's do simpler check:
+      // where.retryCount = { lt: 3 }; is safer for Prisma group locks or we can do raw code filters if needed. Let's filter where nextRetryAt is not null or retryCount < 3.
+    }
+
+    if (nextRetryBefore) {
+      where.nextRetryAt = { lte: new Date(nextRetryBefore) };
     }
 
     // Date range filter
@@ -97,9 +116,15 @@ export const getMessages = async (
           errorCode: m.errorCode,
           errorMessage: m.errorMessage,
           retryCount: m.retryCount,
-          sentAt: m.sentAt,
-          deliveredAt: m.deliveredAt,
-          readAt: m.readAt,
+          maxRetries: m.maxRetries,
+          nextRetryAt: m.nextRetryAt,
+          lastAttemptAt: m.lastAttemptAt,
+          processingStartedAt: m.processingStartedAt,
+          submittedAt: m.submittedAt,
+          failedAt: m.failedAt,
+          cancelledAt: m.cancelledAt,
+          providerName: m.providerName,
+          providerMessageId: m.providerMessageId,
           createdAt: m.createdAt,
           updatedAt: m.updatedAt,
         })),
@@ -153,9 +178,15 @@ export const getMessageById = async (
         errorCode: message.errorCode,
         errorMessage: message.errorMessage,
         retryCount: message.retryCount,
-        sentAt: message.sentAt,
-        deliveredAt: message.deliveredAt,
-        readAt: message.readAt,
+        maxRetries: message.maxRetries,
+        nextRetryAt: message.nextRetryAt,
+        lastAttemptAt: message.lastAttemptAt,
+        processingStartedAt: message.processingStartedAt,
+        submittedAt: message.submittedAt,
+        failedAt: message.failedAt,
+        cancelledAt: message.cancelledAt,
+        providerName: message.providerName,
+        providerMessageId: message.providerMessageId,
         createdAt: message.createdAt,
         updatedAt: message.updatedAt,
       },
@@ -218,6 +249,18 @@ export const getBroadcastMessages = async (
           subscriberName: m.subscriber.name,
           phoneNumber: mask ? maskPhone(m.subscriber.phoneNumber) : m.subscriber.phoneNumber,
           status: m.status,
+          errorCode: m.errorCode,
+          errorMessage: m.errorMessage,
+          retryCount: m.retryCount,
+          maxRetries: m.maxRetries,
+          nextRetryAt: m.nextRetryAt,
+          lastAttemptAt: m.lastAttemptAt,
+          processingStartedAt: m.processingStartedAt,
+          submittedAt: m.submittedAt,
+          failedAt: m.failedAt,
+          cancelledAt: m.cancelledAt,
+          providerName: m.providerName,
+          providerMessageId: m.providerMessageId,
           createdAt: m.createdAt,
           updatedAt: m.updatedAt,
         })),
@@ -231,3 +274,101 @@ export const getBroadcastMessages = async (
     next(error);
   }
 };
+
+export const requeueMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      throw new BadRequestError("Invalid message ID");
+    }
+
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      throw new BadRequestError("Authenticated administrator required");
+    }
+
+    const message = await prisma.message.findUnique({
+      where: { id },
+      include: { broadcast: true },
+    });
+
+    if (!message) {
+      throw new NotFoundError("Message not found");
+    }
+
+    if (message.status !== "FAILED") {
+      throw new BadRequestError("Only FAILED messages can be manually requeued");
+    }
+
+    if (message.broadcast.status === "CANCELLED") {
+      throw new BadRequestError("Cannot requeue messages belonging to a CANCELLED broadcast");
+    }
+
+    // Update message state back to QUEUED
+    const updated = await prisma.$transaction(async (tx) => {
+      const msg = await tx.message.update({
+        where: { id },
+        data: {
+          status: "QUEUED",
+          retryCount: 0,
+          errorCode: null,
+          errorMessage: null,
+          failedAt: null,
+          nextRetryAt: null,
+          lastAttemptAt: null,
+        },
+      });
+
+      await tx.messageStatusEvent.create({
+        data: {
+          messageId: id,
+          status: "QUEUED",
+          previousStatus: "FAILED",
+          workerId: `admin-${adminId}`,
+          metadata: { reason: "Manual admin requeue" },
+        },
+      });
+
+      return msg;
+    });
+
+    // Recalculate parent broadcast status
+    // Import dynamically or execute inline
+    // Wait, let's recalculate broadcast status by calling a helper or updating status to PROCESSING/QUEUED if it was terminal
+    await prisma.broadcast.update({
+      where: { id: message.broadcastId },
+      data: {
+        status: message.broadcast.status === "FAILED" || message.broadcast.status === "PARTIALLY_FAILED" ? "PROCESSING" : message.broadcast.status,
+      },
+    });
+
+    // Create Audit Log
+    await prisma.auditLog.create({
+      data: {
+        adminId,
+        action: "MESSAGE_REQUEUED",
+        entityType: "Message",
+        entityId: id,
+        metadata: { broadcastId: message.broadcastId },
+      },
+    });
+
+    logger.info(`Message ID ${id} manually requeued by Admin ID: ${adminId}`, {
+      messageId: id,
+      adminId,
+      requestId: req.id as string,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

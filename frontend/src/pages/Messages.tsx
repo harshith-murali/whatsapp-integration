@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/index.js";
+import { useAuth } from "../context/AuthContext.js";
 import {
   MessageSquare,
   Search,
   ChevronLeft,
   ChevronRight,
-  Calendar,
+  RefreshCw,
 } from "lucide-react";
 
 interface MessageLog {
@@ -17,7 +18,20 @@ interface MessageLog {
   subscriberName: string | null;
   phoneNumber: string;
   status: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  retryCount: number;
+  maxRetries: number;
+  nextRetryAt: string | null;
+  lastAttemptAt: string | null;
+  processingStartedAt: string | null;
+  submittedAt: string | null;
+  failedAt: string | null;
+  cancelledAt: string | null;
+  providerName: string | null;
+  providerMessageId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface BroadcastOption {
@@ -26,6 +40,7 @@ interface BroadcastOption {
 }
 
 export const Messages: React.FC = () => {
+  const { admin } = useAuth();
   const [messages, setMessages] = useState<MessageLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +52,16 @@ export const Messages: React.FC = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [broadcastFilter, setBroadcastFilter] = useState("");
+  const [hasErrorFilter, setHasErrorFilter] = useState(false);
+  const [retryWaitingFilter, setRetryWaitingFilter] = useState(false);
   
   // Options lists
   const [broadcasts, setBroadcasts] = useState<BroadcastOption[]>([]);
+  
+  // Track action pending
+  const [actionMessageId, setActionMessageId] = useState<number | null>(null);
+
+  const isAdminOrSuper = admin?.role === "ADMIN" || admin?.role === "SUPER_ADMIN";
 
   // Fetch broadcasts options for select filter
   useEffect(() => {
@@ -61,13 +83,15 @@ export const Messages: React.FC = () => {
     fetchBroadcastOptions();
   }, []);
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
-      let url = `/messages?page=${page}&search=${search}`;
+      let url = `/messages?page=${page}&limit=10&search=${search}`;
       if (statusFilter) url += `&status=${statusFilter}`;
       if (broadcastFilter) url += `&broadcastId=${broadcastFilter}`;
+      if (hasErrorFilter) url += `&hasError=true`;
+      if (retryWaitingFilter) url += `&retryable=true`;
       
       const response = await api.get(url);
       if (response.data?.success) {
@@ -78,13 +102,42 @@ export const Messages: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load message logs");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchMessages();
-  }, [page, statusFilter, broadcastFilter]);
+  }, [page, statusFilter, broadcastFilter, hasErrorFilter, retryWaitingFilter]);
+
+  // Polling logic: poll every 5s if there is any active non-terminal processing message
+  useEffect(() => {
+    const hasActiveMessages = messages.some(
+      (m) => m.status === "QUEUED" || m.status === "PROCESSING"
+    );
+
+    if (!hasActiveMessages) return;
+
+    let intervalId: any;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(intervalId);
+      } else {
+        clearInterval(intervalId);
+        intervalId = setInterval(() => fetchMessages(true), 5000);
+      }
+    };
+
+    // Set poller
+    intervalId = setInterval(() => fetchMessages(true), 5000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [messages]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,65 +145,138 @@ export const Messages: React.FC = () => {
     fetchMessages();
   };
 
+  const handleRequeue = async (id: number) => {
+    try {
+      setActionMessageId(id);
+      const response = await api.post(`/messages/${id}/requeue`);
+      if (response.data?.success) {
+        fetchMessages(true);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to requeue message");
+    } finally {
+      setActionMessageId(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "QUEUED":
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50";
+      case "PROCESSING":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/50 animate-pulse";
+      case "SUBMITTED":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50";
+      case "FAILED":
+        return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50";
+      case "CANCELLED":
+        return "bg-slate-100 text-slate-650 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400 dark:border-slate-800";
+      default:
+        return "bg-slate-50 text-slate-600";
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in w-full max-w-7xl mx-auto">
       {/* Title Header */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Message Delivery Logs
-        </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Track individual WhatsApp delivery logs, event status queues, and failures.
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Message Delivery Logs
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Track individual WhatsApp delivery logs, event status queues, and failures.
+          </p>
+        </div>
+        <button
+          onClick={() => fetchMessages()}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors dark:border-tail-dark-border dark:bg-tail-dark-card dark:text-white dark:hover:bg-slate-800 cursor-pointer"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </button>
       </div>
 
       {/* Filter workspace */}
       <div className="bg-white p-5 rounded-lg border border-tail-border shadow-xs dark:bg-tail-dark-card dark:border-tail-dark-border">
-        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative md:col-span-2">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-              <Search className="h-4 w-4" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search subscriber name or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
-            />
+        <form onSubmit={handleSearchSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative md:col-span-2">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <Search className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search subscriber name or phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+              />
+            </div>
+
+            <div>
+              <select
+                value={broadcastFilter}
+                onChange={(e) => {
+                  setBroadcastFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-750 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
+              >
+                <option value="">All Campaigns</option>
+                {broadcasts.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-750 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
+              >
+                <option value="">All Statuses</option>
+                <option value="QUEUED">QUEUED</option>
+                <option value="PROCESSING">PROCESSING</option>
+                <option value="SUBMITTED">SUBMITTED</option>
+                <option value="FAILED">FAILED</option>
+                <option value="CANCELLED">CANCELLED</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <select
-              value={broadcastFilter}
-              onChange={(e) => {
-                setBroadcastFilter(e.target.value);
-                setPage(1);
-              }}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
-            >
-              <option value="">All Campaigns</option>
-              {broadcasts.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="flex flex-wrap items-center gap-6 pt-1 text-sm">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-slate-650 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={hasErrorFilter}
+                onChange={(e) => {
+                  setHasErrorFilter(e.target.checked);
+                  setPage(1);
+                }}
+                className="rounded border-slate-300 text-indigo-650 focus:ring-indigo-500 h-4 w-4 dark:border-tail-dark-border dark:bg-tail-dark-bg"
+              />
+              <span>Has Processing Errors</span>
+            </label>
 
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-350"
-            >
-              <option value="">All Statuses</option>
-              <option value="QUEUED">QUEUED</option>
-              <option value="CANCELLED">CANCELLED</option>
-            </select>
+            <label className="inline-flex items-center gap-2 cursor-pointer text-slate-650 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={retryWaitingFilter}
+                onChange={(e) => {
+                  setRetryWaitingFilter(e.target.checked);
+                  setPage(1);
+                }}
+                className="rounded border-slate-300 text-indigo-650 focus:ring-indigo-500 h-4 w-4 dark:border-tail-dark-border dark:bg-tail-dark-bg"
+              />
+              <span>Retry Queue Only</span>
+            </label>
           </div>
         </form>
       </div>
@@ -176,21 +302,26 @@ export const Messages: React.FC = () => {
       ) : (
         <div className="rounded-lg bg-white shadow-xs border border-tail-border dark:bg-tail-dark-card dark:border-tail-dark-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left border-collapse">
+            <table className="w-full min-w-[1200px] text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold border-b border-tail-border dark:border-tail-dark-border">
+                <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase font-semibold border-b border-tail-border dark:border-tail-dark-border">
                   <th className="px-5 py-4">Subscriber</th>
                   <th className="px-5 py-4">Phone Number</th>
                   <th className="px-5 py-4">Broadcast Campaign</th>
                   <th className="px-5 py-4">Status</th>
-                  <th className="px-5 py-4 text-right">Queued At</th>
+                  <th className="px-5 py-4">Retry Info</th>
+                  <th className="px-5 py-4">Next Attempt</th>
+                  <th className="px-5 py-4">Provider / ID</th>
+                  <th className="px-5 py-4">Last Attempt</th>
+                  <th className="px-5 py-4">Error details</th>
+                  <th className="px-5 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-tail-border dark:divide-tail-dark-border text-sm">
+              <tbody className="divide-y divide-tail-border dark:divide-tail-dark-border text-xs">
                 {messages.map((msg) => (
                   <tr key={msg.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
                     <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">
-                      {msg.subscriberName || <span className="text-slate-400 italic font-normal">No name provided</span>}
+                      {msg.subscriberName || <span className="text-slate-400 italic font-normal">No name</span>}
                     </td>
                     <td className="px-5 py-4 font-mono text-slate-600 dark:text-slate-400">
                       {msg.phoneNumber}
@@ -201,19 +332,51 @@ export const Messages: React.FC = () => {
                       </Link>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
-                        msg.status === "QUEUED"
-                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
-                          : "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400"
-                      }`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getStatusBadge(msg.status)}`}>
                         {msg.status}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-500 dark:text-slate-400 text-right">
-                      <div className="inline-flex items-center gap-1.5 justify-end">
-                        <Calendar className="h-4 w-4 text-slate-400" />
-                        <span>{new Date(msg.createdAt).toLocaleString()}</span>
-                      </div>
+                    <td className="px-5 py-4 text-slate-550 dark:text-slate-400 font-mono">
+                      {msg.retryCount} / {msg.maxRetries}
+                    </td>
+                    <td className="px-5 py-4 text-slate-550 dark:text-slate-400 font-mono">
+                      {msg.nextRetryAt ? new Date(msg.nextRetryAt).toLocaleTimeString() : <span className="text-slate-350">—</span>}
+                    </td>
+                    <td className="px-5 py-4 text-slate-500 dark:text-slate-450">
+                      {msg.providerName ? (
+                        <div>
+                          <span className="block font-semibold">{msg.providerName}</span>
+                          <span className="block text-[10px] text-slate-400 font-mono truncate max-w-[120px]" title={msg.providerMessageId || ""}>
+                            {msg.providerMessageId || ""}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-350">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-slate-500 dark:text-slate-400">
+                      {msg.lastAttemptAt ? new Date(msg.lastAttemptAt).toLocaleTimeString() : <span className="text-slate-350">—</span>}
+                    </td>
+                    <td className="px-5 py-4 text-rose-650 max-w-[180px] truncate" title={msg.errorMessage || ""}>
+                      {msg.errorCode ? (
+                        <div>
+                          <span className="font-semibold block">{msg.errorCode}</span>
+                          <span className="text-[10px] block text-rose-500/80 truncate">{msg.errorMessage}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-350">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      {isAdminOrSuper && msg.status === "FAILED" && (
+                        <button
+                          disabled={actionMessageId === msg.id}
+                          onClick={() => handleRequeue(msg.id)}
+                          className="inline-flex items-center justify-center px-2.5 py-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold text-[10px] shadow-2xs transition-colors cursor-pointer disabled:opacity-40"
+                        >
+                          {actionMessageId === msg.id ? "Queuing..." : "Requeue"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -231,14 +394,14 @@ export const Messages: React.FC = () => {
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage(page - 1)}
-                  className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
+                  className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
-                  className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
+                  className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer dark:border-tail-dark-border dark:bg-tail-dark-bg"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
