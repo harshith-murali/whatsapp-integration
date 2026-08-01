@@ -2,7 +2,7 @@ import "dotenv/config";
 import crypto from "crypto";
 import os from "os";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { PrismaClient, MessageStatus, BroadcastStatus, WorkerStatus } from "../generated/prisma/client.js";
+import { PrismaClient, MessageStatus, BroadcastStatus, WorkerStatus, MessageAttemptResult, MessageStatusEventSource } from "../generated/prisma/client.js";
 import { MessageProviderFactory } from "../providers/provider-factory.js";
 import { MessageProviderError } from "../providers/message-provider.js";
 import { logger } from "../config/logger.js";
@@ -351,6 +351,7 @@ async function processMessage(message: any) {
   const start = Date.now();
   const provider = MessageProviderFactory.getProvider();
   const maskedNumber = maskPhone(message.phoneNumber);
+  let attemptId: number | null = null;
 
   logger.info(`[Worker] Started processing Message ID ${message.id} for ${maskedNumber}`, {
     workerId: WORKER_ID,
@@ -388,12 +389,25 @@ async function processMessage(message: any) {
     }
 
     // 2. Call provider send abstraction
+    const attempt = await prisma.messageAttempt.create({
+      data: {
+        messageId: message.id,
+        attemptNumber: message.retryCount + 1,
+        provider: process.env.MESSAGE_PROVIDER || "mock",
+      },
+    });
+    attemptId = attempt.id;
+
     const result = await provider.send({
       messageId: message.id,
       broadcastId: message.broadcastId,
       subscriberId: message.subscriberId,
       phoneNumber: message.phoneNumber,
       message: message.broadcast.message,
+      metadata: {
+        templateSnapshot: message.broadcast.templateSnapshot,
+        templateVariables: message.broadcast.templateVariables,
+      },
     });
 
     // 3. Record SUCCESS
@@ -425,10 +439,26 @@ async function processMessage(message: any) {
         data: {
           messageId: message.id,
           status: MessageStatus.SUBMITTED,
+          newStatus: MessageStatus.SUBMITTED,
           previousStatus: MessageStatus.PROCESSING,
+          source: MessageStatusEventSource.WORKER,
           workerId: WORKER_ID,
           metadata: { providerName: result.providerName, durationMs: duration },
         },
+      });
+
+      await tx.messageAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          requestCompletedAt: new Date(),
+          result: MessageAttemptResult.SUCCESS,
+          providerMessageId: result.providerMessageId,
+        },
+      });
+
+      await tx.subscriber.update({
+        where: { id: message.subscriberId },
+        data: { lastOutboundMessageAt: result.submittedAt },
       });
     });
 
@@ -454,6 +484,29 @@ async function processMessage(message: any) {
       const currentRetry = message.retryCount + 1;
       const willRetry = isRetryable && currentRetry <= MAX_RETRIES;
 
+      const attemptData = {
+        requestCompletedAt: new Date(),
+        result: willRetry ? MessageAttemptResult.RETRYABLE_FAILURE : MessageAttemptResult.PERMANENT_FAILURE,
+        errorCode: errCode,
+        retryable: isRetryable,
+      };
+
+      if (attemptId) {
+        await tx.messageAttempt.update({
+          where: { id: attemptId },
+          data: attemptData,
+        });
+      } else {
+        await tx.messageAttempt.create({
+          data: {
+            messageId: message.id,
+            attemptNumber: currentRetry,
+            provider: process.env.MESSAGE_PROVIDER || "mock",
+            ...attemptData,
+          },
+        });
+      }
+
       if (willRetry) {
         // Schedule retry with backoff
         const nextRetry = calculateNextRetryAt(currentRetry);
@@ -475,7 +528,9 @@ async function processMessage(message: any) {
           data: {
             messageId: message.id,
             status: MessageStatus.QUEUED,
+            newStatus: MessageStatus.QUEUED,
             previousStatus: MessageStatus.PROCESSING,
+            source: MessageStatusEventSource.WORKER,
             workerId: WORKER_ID,
             errorCode: errCode,
             metadata: { retryAttempt: currentRetry, nextRetryAt: nextRetry, error: errMsg },
@@ -500,7 +555,9 @@ async function processMessage(message: any) {
           data: {
             messageId: message.id,
             status: MessageStatus.FAILED,
+            newStatus: MessageStatus.FAILED,
             previousStatus: MessageStatus.PROCESSING,
+            source: MessageStatusEventSource.WORKER,
             workerId: WORKER_ID,
             errorCode: isRetryable ? "RETRIES_EXHAUSTED" : errCode,
             metadata: { error: errMsg, retryCount: message.retryCount },

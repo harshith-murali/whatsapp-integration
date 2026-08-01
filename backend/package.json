@@ -12,7 +12,11 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "worker:dev": "tsx watch src/workers/message.worker.ts",
-    "worker:start": "node dist/workers/message.worker.js"
+    "worker:start": "node dist/workers/message.worker.js",
+    "webhook:worker:dev": "tsx watch src/workers/webhook.worker.ts",
+    "webhook:worker:start": "node dist/workers/webhook.worker.js",
+    "templates:sync": "tsx src/scripts/sync-templates.ts",
+    "webhooks:cleanup": "tsx src/scripts/cleanup-webhooks.ts"
   },
   "keywords": [],
   "author": "",

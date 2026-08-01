@@ -3,6 +3,7 @@ import { api } from "../api/index.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useLocation } from "react-router-dom";
 import { hasPermission } from "../utils/permissions.js";
+import { countryCodes, splitPhoneNumber } from "../utils/countryCodes.js";
 import {
   Plus,
   Search,
@@ -19,6 +20,7 @@ interface Subscriber {
   id: number;
   name: string | null;
   phoneNumber: string;
+  countryCode?: string | null;
   status: "ACTIVE" | "UNSUBSCRIBED" | "BLOCKED";
   optedIn: boolean;
   optedInAt: string | null;
@@ -49,6 +51,7 @@ export const Subscribers: React.FC = () => {
   // Form states
   const [selectedSub, setSelectedSub] = useState<Subscriber | null>(null);
   const [subName, setSubName] = useState("");
+  const [subCountryCode, setSubCountryCode] = useState("+91");
   const [subPhone, setSubPhone] = useState("");
   const [subStatus, setSubStatus] = useState<"ACTIVE" | "UNSUBSCRIBED" | "BLOCKED">("ACTIVE");
   const [subOptedIn, setSubOptedIn] = useState(true);
@@ -110,6 +113,7 @@ export const Subscribers: React.FC = () => {
 
   const openCreateModal = () => {
     setSubName("");
+    setSubCountryCode("+91");
     setSubPhone("");
     setSubStatus("ACTIVE");
     setSubOptedIn(true);
@@ -124,6 +128,7 @@ export const Subscribers: React.FC = () => {
     try {
       const response = await api.post("/subscribers", {
         name: subName || null,
+        countryCode: subCountryCode,
         phoneNumber: subPhone,
         status: subStatus,
         optedIn: subOptedIn,
@@ -141,8 +146,10 @@ export const Subscribers: React.FC = () => {
 
   const openEditModal = (sub: Subscriber) => {
     setSelectedSub(sub);
+    const splitPhone = splitPhoneNumber(sub.phoneNumber, sub.countryCode || "+91");
     setSubName(sub.name || "");
-    setSubPhone(sub.phoneNumber);
+    setSubCountryCode(sub.countryCode || splitPhone.countryCode);
+    setSubPhone(splitPhone.nationalNumber);
     setSubStatus(sub.status);
     setSubOptedIn(sub.optedIn);
     setFormError(null);
@@ -157,6 +164,7 @@ export const Subscribers: React.FC = () => {
     try {
       const response = await api.patch(`/subscribers/${selectedSub.id}`, {
         name: subName || null,
+        countryCode: subCountryCode,
         phoneNumber: subPhone,
         status: subStatus,
         optedIn: subOptedIn,
@@ -467,16 +475,29 @@ export const Subscribers: React.FC = () => {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Phone Number (Required)
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={subPhone}
-                    onChange={(e) => setSubPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
-                  />
+                  <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-2">
+                    <select
+                      value={subCountryCode}
+                      onChange={(e) => setSubCountryCode(e.target.value)}
+                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
+                    >
+                      {countryCodes.map((country) => (
+                        <option key={`${country.iso}-${country.code}`} value={country.code}>
+                          {country.iso} {country.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      required
+                      value={subPhone}
+                      onChange={(e) => setSubPhone(e.target.value)}
+                      placeholder="98765 43210"
+                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+                    />
+                  </div>
                   <p className="text-xs text-slate-400 mt-1.5">
-                    Will be normalized automatically (saved without spaces, brackets, dashes, or + signs).
+                    Saved as a full WhatsApp number in the database, for example {subCountryCode.replace("+", "")}9876543210.
                   </p>
                 </div>
 
@@ -576,14 +597,27 @@ export const Subscribers: React.FC = () => {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Phone Number (Required)
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={subPhone}
-                    onChange={(e) => setSubPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
-                  />
+                  <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-2">
+                    <select
+                      value={subCountryCode}
+                      onChange={(e) => setSubCountryCode(e.target.value)}
+                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300"
+                    >
+                      {countryCodes.map((country) => (
+                        <option key={`${country.iso}-${country.code}`} value={country.code}>
+                          {country.iso} {country.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      required
+                      value={subPhone}
+                      onChange={(e) => setSubPhone(e.target.value)}
+                      placeholder="98765 43210"
+                      className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

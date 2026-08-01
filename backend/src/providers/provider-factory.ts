@@ -1,5 +1,6 @@
 import { MessageProvider } from "./message-provider.js";
 import { MockWhatsAppProvider } from "./mock-provider.js";
+import { MetaWhatsAppProvider } from "./meta-whatsapp.provider.js";
 
 export class MessageProviderFactory {
   private static instance: MessageProvider | null = null;
@@ -13,9 +14,13 @@ export class MessageProviderFactory {
 
     switch (providerType) {
       case "mock":
-      default:
         this.instance = new MockWhatsAppProvider();
         break;
+      case "meta":
+        this.instance = new MetaWhatsAppProvider();
+        break;
+      default:
+        throw new Error("Unsupported MESSAGE_PROVIDER. Use mock or meta.");
     }
 
     return this.instance;

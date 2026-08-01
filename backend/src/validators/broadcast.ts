@@ -21,6 +21,11 @@ const baseBroadcastObject = z.object({
     .positive("Group ID must be a positive integer")
     .optional()
     .nullable(),
+  messageTemplateId: z.number().int().positive().optional().nullable(),
+  templateVariables: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    .optional()
+    .nullable(),
 });
 
 export const createBroadcastSchema = baseBroadcastObject

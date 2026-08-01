@@ -72,6 +72,44 @@ enum WorkerStatus {
   ERROR
 }
 
+enum MessageTemplateStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  PAUSED
+  DISABLED
+  UNKNOWN
+}
+
+enum MessageStatusEventSource {
+  WORKER
+  WEBHOOK
+  SYSTEM
+  ADMIN
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum IncomingMessageStatus {
+  UNREAD
+  OPEN
+  RESOLVED
+  IGNORED
+}
+
+enum MessageAttemptResult {
+  STARTED
+  SUCCESS
+  RETRYABLE_FAILURE
+  PERMANENT_FAILURE
+}
+
 model Admin {
   id                 Int                     @id @default(autoincrement())
   name               String
@@ -85,6 +123,7 @@ model Admin {
   createdGroups      SubscriberGroup[]       @relation("CreatedGroups")
   addedGroupMembers  SubscriberGroupMember[] @relation("AddedGroupMembers")
   auditLogs          AuditLog[]
+  assignedInboxMessages IncomingMessage[]   @relation("AssignedInboxMessages")
   createdAt          DateTime                @default(now()) @map("created_at")
   updatedAt          DateTime                @updatedAt @map("updated_at")
 
@@ -94,12 +133,18 @@ model Admin {
 model Subscriber {
   id               Int                     @id @default(autoincrement())
   name             String?
+  countryCode      String?                 @map("country_code")
   phoneNumber      String                  @unique @map("phone_number")
   optedIn          Boolean                 @default(true) @map("opted_in")
   status           SubscriberStatus        @default(ACTIVE)
   optedInAt        DateTime?               @map("opted_in_at")
   unsubscribedAt   DateTime?               @map("unsubscribed_at")
+  lastInboundMessageAt  DateTime?          @map("last_inbound_message_at")
+  lastOutboundMessageAt DateTime?          @map("last_outbound_message_at")
+  unsubscribeSource     String?            @map("unsubscribe_source")
+  consentUpdatedAt      DateTime?          @map("consent_updated_at")
   messages         Message[]
+  incomingMessages IncomingMessage[]
   groupMemberships SubscriberGroupMember[]
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
@@ -143,6 +188,11 @@ model Broadcast {
   title              String
   message            String                @db.Text
   templateName       String?               @map("template_name")
+  templateLanguage   String?               @map("template_language")
+  templateVariables  Json?                 @map("template_variables")
+  templateSnapshot   Json?                 @map("template_snapshot")
+  messageTemplateId  Int?                  @map("message_template_id")
+  messageTemplate    MessageTemplate?      @relation(fields: [messageTemplateId], references: [id], onDelete: SetNull)
   category           BroadcastCategory     @default(ANNOUNCEMENT)
   severity           BroadcastSeverity     @default(LOW)
   audienceType       BroadcastAudienceType @default(ALL_ACTIVE_SUBSCRIBERS) @map("audience_type")
@@ -174,6 +224,7 @@ model Broadcast {
   @@index([status])
   @@index([createdById])
   @@index([groupId])
+  @@index([messageTemplateId])
   @@index([createdAt])
   @@map("broadcasts")
 }
@@ -197,12 +248,23 @@ model Message {
   cancelledAt         DateTime?            @map("cancelled_at")
   providerMessageId   String?              @unique @map("provider_message_id")
   providerName        String?              @map("provider_name")
+  sentAt              DateTime?            @map("sent_at")
+  deliveredAt         DateTime?            @map("delivered_at")
+  readAt              DateTime?            @map("read_at")
+  providerErrorCode   String?              @map("provider_error_code")
+  providerErrorSubcode String?             @map("provider_error_subcode")
+  providerErrorType   String?              @map("provider_error_type")
+  providerErrorTitle  String?              @map("provider_error_title")
+  providerErrorDetails String?             @db.Text @map("provider_error_details")
+  lastWebhookAt       DateTime?            @map("last_webhook_at")
+  latestProviderTimestamp DateTime?        @map("latest_provider_timestamp")
   workerId            String?              @map("worker_id")
   claimToken          String?              @map("claim_token")
   claimExpiresAt      DateTime?            @map("claim_expires_at")
   broadcast           Broadcast            @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
   subscriber          Subscriber           @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
   statusEvents        MessageStatusEvent[]
+  attempts            MessageAttempt[]
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
 
@@ -219,7 +281,11 @@ model MessageStatusEvent {
   id             Int           @id @default(autoincrement())
   messageId      Int           @map("message_id")
   status         MessageStatus
+  newStatus      MessageStatus? @map("new_status")
   previousStatus MessageStatus? @map("previous_status")
+  source         MessageStatusEventSource @default(WORKER)
+  eventKey       String?       @unique @map("event_key")
+  providerTimestamp DateTime?  @map("provider_timestamp")
   workerId       String?       @map("worker_id")
   errorCode      String?       @map("error_code")
   metadata       Json?
@@ -230,6 +296,100 @@ model MessageStatusEvent {
 
   @@index([messageId, eventTimestamp])
   @@map("message_status_events")
+}
+
+model MessageAttempt {
+  id                 Int                  @id @default(autoincrement())
+  messageId          Int                  @map("message_id")
+  attemptNumber      Int                  @map("attempt_number")
+  provider           String
+  requestStartedAt   DateTime             @default(now()) @map("request_started_at")
+  requestCompletedAt DateTime?            @map("request_completed_at")
+  result             MessageAttemptResult @default(STARTED)
+  providerMessageId  String?              @map("provider_message_id")
+  errorCode          String?              @map("error_code")
+  retryable          Boolean?
+  message            Message              @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  @@index([messageId])
+  @@index([providerMessageId])
+  @@map("message_attempts")
+}
+
+model MessageTemplate {
+  id              Int                   @id @default(autoincrement())
+  metaTemplateId  String?               @map("meta_template_id")
+  name            String
+  language        String
+  category        String?
+  status          MessageTemplateStatus @default(UNKNOWN)
+  headerType      String?               @map("header_type")
+  body            String                @db.Text
+  footer          String?               @db.Text
+  components      Json
+  parameterSchema Json?                 @map("parameter_schema")
+  lastSyncedAt    DateTime?             @map("last_synced_at")
+  broadcasts      Broadcast[]
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  @@unique([name, language])
+  @@index([status])
+  @@index([lastSyncedAt])
+  @@map("message_templates")
+}
+
+model IncomingMessage {
+  id                       Int                   @id @default(autoincrement())
+  providerMessageId        String                @unique @map("provider_message_id")
+  phoneNumber              String                @map("phone_number")
+  subscriberId             Int?                  @map("subscriber_id")
+  waContactId              String?               @map("wa_contact_id")
+  contactName              String?               @map("contact_name")
+  messageType              String                @map("message_type")
+  textBody                 String?               @db.Text @map("text_body")
+  interactivePayload       Json?                 @map("interactive_payload")
+  mediaId                  String?               @map("media_id")
+  replyToProviderMessageId String?               @map("reply_to_provider_message_id")
+  receivedAt               DateTime              @map("received_at")
+  providerTimestamp        DateTime              @map("provider_timestamp")
+  status                   IncomingMessageStatus @default(UNREAD)
+  assignedAdminId          Int?                  @map("assigned_admin_id")
+  rawWebhookEventId        Int?                  @map("raw_webhook_event_id")
+  subscriber               Subscriber?           @relation(fields: [subscriberId], references: [id], onDelete: SetNull)
+  assignedAdmin            Admin?                @relation("AssignedInboxMessages", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  rawWebhookEvent          WebhookEvent?         @relation(fields: [rawWebhookEventId], references: [id], onDelete: SetNull)
+  createdAt                DateTime              @default(now()) @map("created_at")
+  updatedAt                DateTime              @updatedAt @map("updated_at")
+
+  @@index([subscriberId])
+  @@index([status])
+  @@index([assignedAdminId])
+  @@index([receivedAt])
+  @@map("incoming_messages")
+}
+
+model WebhookEvent {
+  id                 Int                     @id @default(autoincrement())
+  eventKey           String                  @unique @map("event_key")
+  objectType         String                  @map("object_type")
+  provider           String
+  payloadHash        String                  @map("payload_hash")
+  payload            Json?
+  signatureValid     Boolean                 @map("signature_valid")
+  processingStatus   WebhookProcessingStatus @default(RECEIVED) @map("processing_status")
+  processingAttempts Int                     @default(0) @map("processing_attempts")
+  errorMessage       String?                 @db.Text @map("error_message")
+  receivedAt         DateTime                @default(now()) @map("received_at")
+  processedAt        DateTime?               @map("processed_at")
+  incomingMessages   IncomingMessage[]
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  @@index([processingStatus, receivedAt])
+  @@index([receivedAt])
+  @@map("webhook_events")
 }
 
 model AuditLog {

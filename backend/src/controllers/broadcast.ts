@@ -19,7 +19,9 @@ import {
   BroadcastAudienceType,
   SubscriberStatus,
   MessageStatus,
+  MessageTemplateStatus,
 } from "../generated/prisma/client.js";
+import { getMessageProviderMode } from "../config/env.js";
 
 /** Helper to mask subscriber phone numbers in previews */
 const maskPhone = (phone: string): string => {
@@ -186,6 +188,8 @@ export const createBroadcast = async (
       data: {
         title: validated.title,
         message: validated.message,
+        messageTemplateId: validated.messageTemplateId || null,
+        templateVariables: validated.templateVariables || undefined,
         category: validated.category,
         severity: validated.severity,
         audienceType: validated.audienceType,
@@ -269,6 +273,8 @@ export const updateBroadcast = async (
     const updateData: any = {
       title: validated.title,
       message: validated.message,
+      messageTemplateId: validated.messageTemplateId,
+      templateVariables: validated.templateVariables,
       category: validated.category,
       severity: validated.severity,
       audienceType: validated.audienceType,
@@ -725,6 +731,7 @@ export const queueBroadcast = async (
       // 1. Lock and validate broadcast status
       const broadcast = await tx.broadcast.findUnique({
         where: { id },
+        include: { messageTemplate: true },
       });
 
       if (!broadcast) {
@@ -733,6 +740,12 @@ export const queueBroadcast = async (
 
       if (broadcast.status !== BroadcastStatus.APPROVED) {
         throw new ConflictError("Only APPROVED broadcasts can be queued");
+      }
+
+      if (getMessageProviderMode() === "meta") {
+        if (!broadcast.messageTemplate || broadcast.messageTemplate.status !== MessageTemplateStatus.APPROVED) {
+          throw new ConflictError("Meta broadcasts require a synced APPROVED WhatsApp template before queueing");
+        }
       }
 
       // 2. Resolve eligible subscribers dynamically at queue time
@@ -792,6 +805,20 @@ export const queueBroadcast = async (
           status: BroadcastStatus.QUEUED,
           totalRecipients: recipientCount,
           queuedAt: new Date(),
+          templateName: broadcast.messageTemplate?.name || broadcast.templateName,
+          templateLanguage: broadcast.messageTemplate?.language || broadcast.templateLanguage,
+          templateSnapshot: broadcast.messageTemplate
+            ? {
+                id: broadcast.messageTemplate.id,
+                metaTemplateId: broadcast.messageTemplate.metaTemplateId,
+                name: broadcast.messageTemplate.name,
+                language: broadcast.messageTemplate.language,
+                category: broadcast.messageTemplate.category,
+                status: broadcast.messageTemplate.status,
+                components: broadcast.messageTemplate.components,
+                parameterSchema: broadcast.messageTemplate.parameterSchema,
+              }
+            : (broadcast.templateSnapshot === null ? undefined : broadcast.templateSnapshot as any),
         },
       });
 
@@ -1010,4 +1037,3 @@ export const requeueFailedBroadcast = async (
     next(error);
   }
 };
-

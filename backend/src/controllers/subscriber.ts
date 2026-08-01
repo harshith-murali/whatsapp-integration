@@ -162,6 +162,7 @@ export const createSubscriber = async (
     const subscriber = await prisma.subscriber.create({
       data: {
         name: validated.name,
+        countryCode: validated.countryCode,
         phoneNumber: validated.phoneNumber,
         status: validated.status,
         optedIn,
@@ -214,6 +215,7 @@ export const updateSubscriber = async (
     // Prepare update data incorporating business logic
     const updateData: Prisma.SubscriberUpdateInput = {
       name: validated.name !== undefined ? validated.name : subscriber.name,
+      countryCode: validated.countryCode !== undefined ? validated.countryCode : subscriber.countryCode,
       phoneNumber: validated.phoneNumber !== undefined ? validated.phoneNumber : subscriber.phoneNumber,
     };
 

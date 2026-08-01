@@ -8,6 +8,11 @@ import { router as broadcastRouter } from "./broadcast.js";
 import { router as messageRouter } from "./message.js";
 import { router as auditLogRouter } from "./auditLog.js";
 import { router as workerRouter } from "./worker.js";
+import { router as webhookRouter } from "./webhook.js";
+import { router as templateRouter } from "./template.js";
+import { router as integrationRouter } from "./integration.js";
+import { router as inboxRouter } from "./inbox.js";
+import { router as webhookEventRouter } from "./webhookEvent.js";
 
 export const router = Router();
 
@@ -20,3 +25,8 @@ router.use("/broadcasts", broadcastRouter);
 router.use("/messages", messageRouter);
 router.use("/audit-logs", auditLogRouter);
 router.use("/workers", workerRouter);
+router.use("/webhooks", webhookRouter);
+router.use("/templates", templateRouter);
+router.use("/integrations", integrationRouter);
+router.use("/inbox", inboxRouter);
+router.use("/webhook-events", webhookEventRouter);
