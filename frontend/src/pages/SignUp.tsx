@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clipboard, Mail, Phone, UserRound } from "lucide-react";
+import { CheckCircle2, Mail, Phone, Send, UserRound } from "lucide-react";
 import { AuthShell } from "../components/AuthShell.js";
 import { Button } from "../components/ui/button.js";
 import { SelectMenu } from "../components/ui/select-menu.js";
 import { countryCodes } from "../utils/countryCodes.js";
+import { api } from "../api/index.js";
 
 export const SignUp: React.FC = () => {
   const [firstName, setFirstName] = useState("");
@@ -12,7 +13,14 @@ export const SignUp: React.FC = () => {
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [company, setCompany] = useState("");
+  const [department, setDepartment] = useState("");
+  const [reason, setReason] = useState("");
+  const [requestedRole, setRequestedRole] = useState("");
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formStartedAt] = useState(() => Date.now());
 
   const countryOptions = useMemo(
     () =>
@@ -23,38 +31,75 @@ export const SignUp: React.FC = () => {
     []
   );
 
-  const requestDetails = [
-    `First name: ${firstName.trim()}`,
-    `Last name: ${lastName.trim()}`,
-    `Email: ${email.trim()}`,
-    `Phone: ${countryCode}${phoneNumber.replace(/\D/g, "")}`,
-  ].join("\n");
+  const roleOptions = [
+    { value: "", label: "No preference" },
+    { value: "ADMIN", label: "Admin" },
+    { value: "OPERATOR", label: "Operator" },
+    { value: "VIEWER", label: "Viewer" },
+  ];
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setRequestMessage(null);
 
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !phoneNumber.trim()) {
-      setRequestMessage("Fill in your name, email, country code, and phone number before sending this to a Super Admin.");
+      setRequestMessage("Fill in your name, work email, country code, and phone number before submitting.");
       return;
     }
 
+    setLoading(true);
     try {
-      await navigator.clipboard.writeText(requestDetails);
-      setRequestMessage("Access details copied. Send them to your Super Admin so they can create your account.");
-    } catch {
-      setRequestMessage("Access details are ready. Send them to your Super Admin so they can create your account.");
+      await api.post("/access-requests", {
+        firstName,
+        lastName,
+        email,
+        phoneNumber: `${countryCode}${phoneNumber}`,
+        company: company || undefined,
+        department: department || undefined,
+        reason: reason || undefined,
+        requestedRole: requestedRole || undefined,
+        formStartedAt,
+        website: "",
+      });
+      setSubmitted(true);
+    } catch (error: any) {
+      setRequestMessage(
+        error.response?.data?.message || "We could not submit this access request. Please check the form and try again."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <AuthShell
       eyebrow="ACCESS"
-      title="Create Access"
-      subtitle="Share these details with a Super Admin so they can create your dashboard account."
+      title={submitted ? "Access request submitted" : "Request Platform Access"}
+      subtitle={
+        submitted
+          ? "Your request has been sent to a Super Admin for review. You will be contacted if access is approved."
+          : "Submit your details for review. A Super Admin will create your account if approved."
+      }
     >
+      {submitted ? (
+        <div className="space-y-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+            No account or session was created. After approval, sign in with the credentials provided by your Super Admin.
+          </div>
+          <Link
+            to="/login"
+            className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-black px-4 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition-colors hover:bg-slate-900 focus:outline-hidden focus:ring-4 focus:ring-slate-300"
+          >
+            Return to Sign In
+          </Link>
+        </div>
+      ) : (
+        <>
       {requestMessage && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium leading-6 text-slate-700">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium leading-6 text-rose-700">
           <span>{requestMessage}</span>
         </div>
       )}
@@ -98,7 +143,7 @@ export const SignUp: React.FC = () => {
 
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-800">
-            Email
+            Work email
           </label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -111,6 +156,63 @@ export const SignUp: React.FC = () => {
               className="block h-12 w-full rounded-lg border border-transparent bg-slate-100 pl-11 pr-4 text-sm text-slate-950 shadow-inner outline-hidden transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-200/80"
             />
           </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-800">
+              Company
+            </label>
+            <input
+              type="text"
+              value={company}
+              onChange={(event) => setCompany(event.target.value)}
+              placeholder="Optional"
+              className="block h-12 w-full rounded-lg border border-transparent bg-slate-100 px-4 text-sm text-slate-950 shadow-inner outline-hidden transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-200/80"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-800">
+              Department
+            </label>
+            <input
+              type="text"
+              value={department}
+              onChange={(event) => setDepartment(event.target.value)}
+              placeholder="Optional"
+              className="block h-12 w-full rounded-lg border border-transparent bg-slate-100 px-4 text-sm text-slate-950 shadow-inner outline-hidden transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-200/80"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-slate-800">
+            Requested role
+          </label>
+          <SelectMenu
+            value={requestedRole}
+            onValueChange={setRequestedRole}
+            options={roleOptions}
+            label="Requested role"
+            className="h-12 border-transparent bg-slate-100 text-slate-950 shadow-inner hover:bg-white"
+          />
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Requested role is only a preference. Final access is assigned by a Super Admin.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-slate-800">
+            Reason for access
+          </label>
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Optional"
+            rows={3}
+            className="block w-full resize-none rounded-lg border border-transparent bg-slate-100 px-4 py-3 text-sm text-slate-950 shadow-inner outline-hidden transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-200/80"
+          />
         </div>
 
         <div>
@@ -141,15 +243,22 @@ export const SignUp: React.FC = () => {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-          Accounts are still created by a Super Admin. This form prepares the exact details they need, including your full phone number with country code.
+          This only submits an access request. It will not create an account, assign a role, or sign you in.
         </div>
 
         <Button
           type="submit"
+          disabled={loading}
           className="mt-6 flex h-12 w-full justify-center rounded-lg bg-black px-4 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 hover:bg-slate-900 focus:ring-4 focus:ring-slate-300"
         >
-          <Clipboard className="h-4 w-4" />
-          Prepare Access Details
+          {loading ? (
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <>
+              <Send className="h-4 w-4" />
+              Send Access Request
+            </>
+          )}
         </Button>
       </form>
 
@@ -159,6 +268,8 @@ export const SignUp: React.FC = () => {
           Sign In
         </Link>
       </p>
+        </>
+      )}
     </AuthShell>
   );
 };

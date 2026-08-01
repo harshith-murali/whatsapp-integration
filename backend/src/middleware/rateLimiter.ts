@@ -14,10 +14,11 @@ export const createRateLimiter = (args: {
   windowMs: number;
   maxRequests: number;
   keyPrefix?: string;
+  keyGenerator?: (req: Request) => string;
 }) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
-    const key = `${args.keyPrefix || args.name}:${ip}`;
+    const key = `${args.keyPrefix || args.name}:${args.keyGenerator ? args.keyGenerator(req) : ip}`;
     const now = Date.now();
 
     if (!store[key]) {
@@ -55,3 +56,21 @@ export const createRateLimiter = (args: {
 
 export const loginRateLimiter = (windowMs = 60 * 1000, maxRequests = 5) =>
   createRateLimiter({ name: "login", windowMs, maxRequests });
+
+export const accessRequestIpRateLimiter = () =>
+  createRateLimiter({
+    name: "access-request-ip",
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 5,
+  });
+
+export const accessRequestEmailRateLimiter = () =>
+  createRateLimiter({
+    name: "access-request-email",
+    windowMs: 24 * 60 * 60 * 1000,
+    maxRequests: 3,
+    keyGenerator: (req) => {
+      const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "missing-email";
+      return email;
+    },
+  });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../hooks/useTheme.js";
@@ -6,6 +6,7 @@ import { hasPermission } from "../utils/permissions.js";
 import type { Permission } from "../utils/permissions.js";
 import { AnimatedBackground } from "./core/animated-background.js";
 import { Button } from "./ui/button.js";
+import { api } from "../api/index.js";
 import {
   LayoutDashboard,
   Users,
@@ -24,7 +25,7 @@ import {
   CheckCircle2,
   Inbox,
   User,
-  FileText,
+  ClipboardList,
 } from "lucide-react";
 
 // Custom Megaphone/Broadcast icon
@@ -78,6 +79,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: "Admin Management",
     subtitle: "Manage admin accounts, roles, and access.",
   },
+  "/access-requests": {
+    title: "Access Requests",
+    subtitle: "Review platform access requests and create approved admin accounts.",
+  },
   "/settings": {
     title: "System Settings",
     subtitle: "Review integration status and operational configuration.",
@@ -89,6 +94,17 @@ interface MenuItem {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   permission: Permission;
+  badge?: number;
+}
+
+interface AdminNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  link?: string | null;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export const Layout: React.FC = () => {
@@ -97,6 +113,9 @@ export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<"notifications" | "chat" | "profile" | null>(null);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingAccessRequests, setPendingAccessRequests] = useState(0);
   const { isDark, toggleTheme } = useTheme();
   const currentMeta =
     PAGE_META[location.pathname] ||
@@ -105,6 +124,11 @@ export const Layout: React.FC = () => {
           title: "Broadcast Details",
           subtitle: "Inspect recipients, message progress, and delivery state.",
         }
+      : location.pathname.startsWith("/access-requests/")
+        ? {
+            title: "Access Request Details",
+            subtitle: "Review requester details, audit history, and account approval state.",
+          }
       : {
           title: "Workspace",
           subtitle: "Manage your WhatsApp alert operations.",
@@ -112,9 +136,48 @@ export const Layout: React.FC = () => {
 
   const closeMenus = () => setOpenMenu(null);
 
+  const fetchHeaderData = async () => {
+    if (!admin) return;
+    try {
+      const notificationResponse = await api.get("/notifications");
+      setNotifications(notificationResponse.data.data.notifications || []);
+      setUnreadNotifications(notificationResponse.data.data.unreadCount || 0);
+    } catch {
+      setNotifications([]);
+      setUnreadNotifications(0);
+    }
+
+    if (hasPermission(admin.role, "accessRequests.view")) {
+      try {
+        const requestResponse = await api.get("/access-requests", {
+          params: { status: "PENDING", limit: 1 },
+        });
+        setPendingAccessRequests(requestResponse.data.data.pendingCount || 0);
+      } catch {
+        setPendingAccessRequests(0);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchHeaderData();
+  }, [admin?.id, location.pathname]);
+
   const goTo = (path: string) => {
     closeMenus();
     navigate(path);
+  };
+
+  const openNotification = async (notification: AdminNotification) => {
+    if (!notification.isRead) {
+      try {
+        await api.patch(`/notifications/${notification.id}/read`);
+      } catch {
+        // Keep navigation responsive even if marking read fails.
+      }
+    }
+    await fetchHeaderData();
+    goTo(notification.link || "/access-requests");
   };
 
   const handleLogout = async () => {
@@ -160,6 +223,13 @@ export const Layout: React.FC = () => {
       permission: "admins.view",
     },
     {
+      name: "Access Requests",
+      path: "/access-requests",
+      icon: ClipboardList,
+      permission: "accessRequests.view",
+      badge: pendingAccessRequests,
+    },
+    {
       name: "Settings",
       path: "/settings",
       icon: SettingsIcon,
@@ -195,13 +265,13 @@ export const Layout: React.FC = () => {
             </span>
             <nav className="space-y-1">
               <AnimatedBackground
-                defaultValue={filteredItems.find((item) => item.path === location.pathname)?.name}
+                defaultValue={filteredItems.find((item) => item.path === location.pathname || (item.path !== "/" && location.pathname.startsWith(`${item.path}/`)))?.name}
                 className="rounded-lg bg-tail-sidebar-active/70"
                 enableHover
               >
                 {filteredItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
+                  const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(`${item.path}/`));
                   return (
                     <Link
                       key={item.name}
@@ -214,7 +284,12 @@ export const Layout: React.FC = () => {
                       }`}
                     >
                       <Icon className="h-5 w-5 mr-3 shrink-0" />
-                      {item.name}
+                      <span className="min-w-0 flex-1">{item.name}</span>
+                      {!!item.badge && (
+                        <span className="ml-2 rounded-full bg-indigo-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -260,13 +335,13 @@ export const Layout: React.FC = () => {
                 Menu
               </span>
               <AnimatedBackground
-                defaultValue={filteredItems.find((item) => item.path === location.pathname)?.name}
+                defaultValue={filteredItems.find((item) => item.path === location.pathname || (item.path !== "/" && location.pathname.startsWith(`${item.path}/`)))?.name}
                 className="rounded-lg bg-tail-sidebar-active/70"
                 enableHover
               >
                 {filteredItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
+                  const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(`${item.path}/`));
                   return (
                     <Link
                       key={item.name}
@@ -280,7 +355,12 @@ export const Layout: React.FC = () => {
                       }`}
                     >
                       <Icon className="h-5 w-5 mr-3 shrink-0" />
-                      {item.name}
+                      <span className="min-w-0 flex-1">{item.name}</span>
+                      {!!item.badge && (
+                        <span className="ml-2 rounded-full bg-indigo-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -343,7 +423,11 @@ export const Layout: React.FC = () => {
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-tail-dark-card" />
+              {unreadNotifications > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-tail-dark-card">
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </span>
+              )}
               </Button>
               {openMenu === "notifications" && (
                 <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl shadow-slate-200/70 dark:border-tail-dark-border dark:bg-tail-dark-card dark:shadow-black/20">
@@ -352,52 +436,37 @@ export const Layout: React.FC = () => {
                       Notifications
                     </p>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      Operational shortcuts from real app sections.
+                      {unreadNotifications} unread updates.
                     </p>
                   </div>
                   <div className="p-2">
-                    <Button
-                      onClick={() => goTo("/broadcasts")}
-                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
-                      <span>
-                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          Review broadcasts
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                          Open drafts, approvals, queued, and failed broadcasts.
-                        </span>
-                      </span>
-                    </Button>
-                    <Button
-                      onClick={() => goTo("/messages")}
-                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <FileText className="mt-0.5 h-4 w-4 text-rose-500" />
-                      <span>
-                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          Check failed messages
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                          Inspect retries, provider errors, and delivery status.
-                        </span>
-                      </span>
-                    </Button>
-                    <Button
-                      onClick={() => goTo("/settings")}
-                      className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
-                      <span>
-                        <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          Integration status
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                          Review Meta configuration and system readiness.
-                        </span>
-                      </span>
-                    </Button>
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                        No notifications yet.
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <Button
+                          key={notification.id}
+                          onClick={() => openNotification(notification)}
+                          className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          {notification.isRead ? (
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-slate-400" />
+                          ) : (
+                            <AlertCircle className="mt-0.5 h-4 w-4 text-indigo-500" />
+                          )}
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              {notification.title}
+                            </span>
+                            <span className="mt-0.5 block line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                              {notification.message}
+                            </span>
+                          </span>
+                        </Button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

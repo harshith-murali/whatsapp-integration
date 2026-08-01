@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-import bcrypt from "bcryptjs";
 import { prisma } from "../config/prisma.js";
 import { createAdminSchema, updateAdminSchema, updateAdminStatusSchema } from "../validators/admin.js";
 import { BadRequestError, NotFoundError, ConflictError } from "../utils/errors.js";
 import { AdminRole, Prisma } from "../generated/prisma/client.js";
+import bcrypt from "bcryptjs";
+import { createAdminAccount } from "../services/adminAccount.js";
 
 // Helper to check if a SUPER_ADMIN is the last active one
 const isLastActiveSuperAdmin = async (adminId: number): Promise<boolean> => {
@@ -86,34 +87,15 @@ export const createAdmin = async (req: Request, res: Response, next: NextFunctio
   try {
     const validated = createAdminSchema.parse(req.body);
 
-    const existing = await prisma.admin.findUnique({
-      where: { email: validated.email },
-    });
-
-    if (existing) {
-      throw new ConflictError("An admin with this email already exists");
-    }
-
-    const passwordHash = await bcrypt.hash(validated.password, 12);
-
-    const admin = await prisma.admin.create({
-      data: {
+    const admin = await prisma.$transaction((tx) =>
+      createAdminAccount(tx, {
         name: validated.name,
         email: validated.email,
-        passwordHash,
+        password: validated.password,
         role: validated.role,
         isActive: validated.isActive,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      })
+    );
 
     res.status(201).json({
       success: true,

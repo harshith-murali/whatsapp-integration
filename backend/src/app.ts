@@ -85,6 +85,7 @@ app.use(
 
 app.use(
   express.json({
+    limit: "64kb",
     verify: (req, _res, buf) => {
       (req as express.Request).rawBody = Buffer.from(buf);
     },

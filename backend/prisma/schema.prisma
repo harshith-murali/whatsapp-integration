@@ -115,6 +115,13 @@ enum IdempotencyStatus {
   COMPLETED
 }
 
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
 model Admin {
   id                 Int                     @id @default(autoincrement())
   name               String
@@ -129,6 +136,9 @@ model Admin {
   addedGroupMembers  SubscriberGroupMember[] @relation("AddedGroupMembers")
   auditLogs          AuditLog[]
   assignedInboxMessages IncomingMessage[]   @relation("AssignedInboxMessages")
+  reviewedAccessRequests AccessRequest[]     @relation("ReviewedAccessRequests")
+  createdAccessRequestAccounts AccessRequest[] @relation("CreatedAccessRequestAccounts")
+  notifications      AdminNotification[]
   createdAt          DateTime                @default(now()) @map("created_at")
   updatedAt          DateTime                @updatedAt @map("updated_at")
 
@@ -418,6 +428,55 @@ model IdempotencyKey {
   @@index([adminId])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+model AccessRequest {
+  id              Int                 @id @default(autoincrement())
+  firstName       String              @map("first_name")
+  lastName        String              @map("last_name")
+  email           String
+  phoneNumber     String              @map("phone_number")
+  company         String?
+  department      String?
+  reason          String?             @db.Text
+  requestedRole   AdminRole?          @map("requested_role")
+  status          AccessRequestStatus @default(PENDING)
+  reviewedById    Int?                @map("reviewed_by_id")
+  reviewedBy      Admin?              @relation("ReviewedAccessRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?           @map("reviewed_at")
+  rejectionReason String?             @db.Text @map("rejection_reason")
+  approvalNotes   String?             @db.Text @map("approval_notes")
+  createdAdminId  Int?                @unique @map("created_admin_id")
+  createdAdmin    Admin?              @relation("CreatedAccessRequestAccounts", fields: [createdAdminId], references: [id], onDelete: SetNull)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@index([reviewedById])
+  @@map("access_requests")
+}
+
+model AdminNotification {
+  id         Int      @id @default(autoincrement())
+  adminId    Int      @map("admin_id")
+  admin      Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  type       String
+  title      String
+  message    String   @db.Text
+  entityType String?  @map("entity_type")
+  entityId   Int?     @map("entity_id")
+  link       String?
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId, isRead])
+  @@index([type])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("admin_notifications")
 }
 
 model AuditLog {

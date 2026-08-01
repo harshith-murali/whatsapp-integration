@@ -12,6 +12,7 @@ import { Broadcasts } from "./pages/Broadcasts.js";
 import { BroadcastDetails } from "./pages/BroadcastDetails.js";
 import { Messages } from "./pages/Messages.js";
 import { AdminManagement } from "./pages/AdminManagement.js";
+import { AccessRequests } from "./pages/AccessRequests.js";
 import { Settings } from "./pages/Settings.js";
 import { Unauthorized } from "./pages/Unauthorized.js";
 import { NotFound } from "./pages/NotFound.js";
@@ -78,6 +79,24 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute permission="admins.view">
                   <AdminManagement />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="access-requests"
+              element={
+                <ProtectedRoute permission="accessRequests.view">
+                  <AccessRequests />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="access-requests/:id"
+              element={
+                <ProtectedRoute permission="accessRequests.view">
+                  <AccessRequests />
                 </ProtectedRoute>
               }
             />

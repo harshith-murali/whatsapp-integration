@@ -30,6 +30,10 @@ export type Permission =
   | "admins.create"
   | "admins.update"
   | "admins.delete"
+  | "accessRequests.view"
+  | "accessRequests.approve"
+  | "accessRequests.reject"
+  | "accessRequests.delete"
   | "settings.manage"
   // Audit Logs
   | "auditLogs.view"
@@ -67,6 +71,10 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "admins.create",
     "admins.update",
     "admins.delete",
+    "accessRequests.view",
+    "accessRequests.approve",
+    "accessRequests.reject",
+    "accessRequests.delete",
     "settings.manage",
     "auditLogs.view",
     // Dashboard widgets
@@ -138,6 +146,7 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/broadcasts": "broadcasts.view",
   "/messages": "messages.view",
   "/admins": "admins.view",
+  "/access-requests": "accessRequests.view",
   "/settings": "settings.manage",
 };
 
@@ -152,6 +161,7 @@ export const canAccessRoute = (role: AdminRole | undefined, path: string): boole
   if (cleanPath.startsWith("/groups/")) return hasPermission(role, "groups.view");
   if (cleanPath.startsWith("/broadcasts/")) return hasPermission(role, "broadcasts.view");
   if (cleanPath.startsWith("/messages/")) return hasPermission(role, "messages.view");
+  if (cleanPath.startsWith("/access-requests/")) return hasPermission(role, "accessRequests.view");
 
   return true;
 };

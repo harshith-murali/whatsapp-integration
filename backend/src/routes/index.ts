@@ -15,6 +15,8 @@ import { router as inboxRouter } from "./inbox.js";
 import { router as webhookEventRouter } from "./webhookEvent.js";
 import { router as healthRouter } from "./health.js";
 import { router as deadLetterRouter } from "./deadLetter.js";
+import { router as accessRequestRouter } from "./accessRequest.js";
+import { router as adminNotificationRouter } from "./adminNotification.js";
 
 export const router = Router();
 
@@ -34,3 +36,5 @@ router.use("/inbox", inboxRouter);
 router.use("/webhook-events", webhookEventRouter);
 router.use("/health", healthRouter);
 router.use("/dead-letter", deadLetterRouter);
+router.use("/access-requests", accessRequestRouter);
+router.use("/notifications", adminNotificationRouter);
