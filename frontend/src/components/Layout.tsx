@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../hooks/useTheme.js";
@@ -117,6 +117,29 @@ export const Layout: React.FC = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [pendingAccessRequests, setPendingAccessRequests] = useState(0);
   const { isDark, toggleTheme } = useTheme();
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (openMenu === "notifications" && notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setOpenMenu(null);
+      }
+      if (openMenu === "chat" && messagesRef.current && !messagesRef.current.contains(target)) {
+        setOpenMenu(null);
+      }
+      if (openMenu === "profile" && profileRef.current && !profileRef.current.contains(target)) {
+        setOpenMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [openMenu]);
   const currentMeta =
     PAGE_META[location.pathname] ||
     (location.pathname.startsWith("/broadcasts/")
@@ -300,13 +323,13 @@ export const Layout: React.FC = () => {
 
         {/* Logout area */}
         <div className="p-4 border-t border-tail-sidebar-active">
-          <Button
+          <button
             onClick={handleLogout}
-            className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer animate-none"
+            className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
           >
             <LogOut className="h-5 w-5 mr-3 shrink-0" />
-            Sign Out
-          </Button>
+            <span>Sign Out</span>
+          </button>
         </div>
       </aside>
 
@@ -367,13 +390,13 @@ export const Layout: React.FC = () => {
               </AnimatedBackground>
             </nav>
             <div className="p-4 border-t border-tail-sidebar-active">
-              <Button
+              <button
                 onClick={handleLogout}
-                className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg"
+                className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-950/20 rounded-lg cursor-pointer"
               >
-                <LogOut className="h-5 w-5 mr-3" />
-                Sign Out
-              </Button>
+                <LogOut className="h-5 w-5 mr-3 shrink-0" />
+                <span>Sign Out</span>
+              </button>
             </div>
           </div>
         </div>
@@ -413,7 +436,7 @@ export const Layout: React.FC = () => {
             </Button>
 
             {/* Notification Bell */}
-            <div className="relative">
+            <div ref={notificationsRef} className="relative">
               <Button
               onClick={() => {
                 if (openMenu !== "notifications") {
@@ -449,10 +472,10 @@ export const Layout: React.FC = () => {
                       </div>
                     ) : (
                       notifications.map((notification) => (
-                        <Button
+                        <button
                           key={notification.id}
                           onClick={() => openNotification(notification)}
-                          className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                          className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                         >
                           {notification.isRead ? (
                             <CheckCircle2 className="mt-0.5 h-4 w-4 text-slate-400" />
@@ -467,7 +490,7 @@ export const Layout: React.FC = () => {
                               {notification.message}
                             </span>
                           </span>
-                        </Button>
+                        </button>
                       ))
                     )}
                   </div>
@@ -476,7 +499,7 @@ export const Layout: React.FC = () => {
             </div>
 
             {/* Messages icon */}
-            <div className="relative">
+            <div ref={messagesRef} className="relative">
               <Button
               onClick={() => setOpenMenu(openMenu === "chat" ? null : "chat")}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -495,36 +518,36 @@ export const Layout: React.FC = () => {
                       Jump into messaging workflows.
                     </p>
                   </div>
-                  <div className="p-2">
-                    <Button
+                  <div className="p-2 space-y-0.5">
+                    <button
                       onClick={() => goTo("/messages")}
-                      className="grid w-full grid-cols-[28px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                     >
-                      <span className="flex h-7 w-7 items-center justify-center">
+                      <span className="flex h-7 w-7 items-center justify-center shrink-0">
                         <MessageSquare className="h-4 w-4 text-indigo-500" />
                       </span>
                       <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Open message logs
                       </span>
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       onClick={() => goTo("/subscribers?add=true")}
-                      className="grid w-full grid-cols-[28px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                     >
-                      <span className="flex h-7 w-7 items-center justify-center">
+                      <span className="flex h-7 w-7 items-center justify-center shrink-0">
                         <Inbox className="h-4 w-4 text-emerald-500" />
                       </span>
                       <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Add subscriber
                       </span>
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}
             </div>
 
             {/* User Profile */}
-            <div className="relative flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-800">
+            <div ref={profileRef} className="relative flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-800">
               <div className="text-right hidden lg:block">
                 <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
                   {admin?.name}
@@ -556,38 +579,38 @@ export const Layout: React.FC = () => {
                       {admin ? ROLE_LABELS[admin.role] : ""}
                     </span>
                   </div>
-                  <div className="p-2">
-                    <Button
+                  <div className="p-2 space-y-0.5">
+                    <button
                       onClick={() => goTo("/settings")}
-                      className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                     >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 shrink-0">
                         <SettingsIcon className="h-4 w-4" />
                       </span>
                       <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Settings
                       </span>
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       onClick={() => goTo("/admins")}
-                      className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                     >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 shrink-0">
                         <User className="h-4 w-4" />
                       </span>
                       <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Admin management
                       </span>
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       onClick={handleLogout}
-                      className="mt-1 grid w-full grid-cols-[36px_minmax(0,1fr)] items-center rounded-lg px-3 py-3 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-red-650 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
                     >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 dark:text-red-400 shrink-0">
                         <LogOut className="h-4 w-4" />
                       </span>
                       <span className="truncate text-sm font-semibold">Sign out</span>
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}

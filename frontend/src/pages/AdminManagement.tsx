@@ -327,8 +327,8 @@ export const AdminManagement: React.FC = () => {
       {/* CREATE MODAL */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-tail-dark-card rounded-lg shadow-xl border border-tail-border dark:border-tail-dark-border overflow-hidden animate-zoom-in">
-            <div className="px-6 py-5 border-b border-tail-border dark:border-tail-dark-border flex justify-between items-center bg-slate-50 dark:bg-tail-dark-card">
+          <div className="w-full max-w-lg bg-white dark:bg-tail-dark-card rounded-lg shadow-xl border border-tail-border dark:border-tail-dark-border animate-zoom-in">
+            <div className="px-6 py-5 border-b border-tail-border dark:border-tail-dark-border flex justify-between items-center bg-slate-50 dark:bg-tail-dark-card rounded-t-lg">
               <div className="flex items-center">
                 <UserPlus className="h-5 w-5 text-indigo-500 mr-2" />
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -429,7 +429,7 @@ export const AdminManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2 rounded-b-lg">
                 <Button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
@@ -453,8 +453,8 @@ export const AdminManagement: React.FC = () => {
       {/* EDIT MODAL */}
       {editModalOpen && selectedAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-tail-dark-card rounded-lg shadow-xl border border-tail-border dark:border-tail-dark-border overflow-hidden animate-zoom-in">
-            <div className="px-6 py-5 border-b border-tail-border dark:border-tail-dark-border flex justify-between items-center bg-slate-50 dark:bg-tail-dark-card">
+          <div className="w-full max-w-lg bg-white dark:bg-tail-dark-card rounded-lg shadow-xl border border-tail-border dark:border-tail-dark-border animate-zoom-in">
+            <div className="px-6 py-5 border-b border-tail-border dark:border-tail-dark-border flex justify-between items-center bg-slate-50 dark:bg-tail-dark-card rounded-t-lg">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 Edit Admin Account
               </h3>
@@ -548,7 +548,7 @@ export const AdminManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2">
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-tail-border dark:border-tail-dark-border flex justify-end space-x-2 rounded-b-lg">
                 <Button
                   type="button"
                   onClick={() => setEditModalOpen(false)}

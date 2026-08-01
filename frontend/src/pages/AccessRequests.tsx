@@ -651,7 +651,7 @@ const Modal: React.FC<{ title: string; children: React.ReactNode; onClose: () =>
   onClose,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs">
-    <div className="w-full max-w-lg overflow-hidden rounded-lg border border-tail-border bg-white shadow-xl dark:border-tail-dark-border dark:bg-tail-dark-card">
+    <div className="w-full max-w-lg rounded-lg border border-tail-border bg-white shadow-xl dark:border-tail-dark-border dark:bg-tail-dark-card">
       <div className="flex items-center justify-between border-b border-tail-border px-6 py-4 dark:border-tail-dark-border">
         <h3 className="text-lg font-bold text-slate-950 dark:text-white">{title}</h3>
         <Button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
