@@ -33,11 +33,20 @@ enum MessageStatus {
   CANCELLED
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
 model Admin {
   id           Int         @id @default(autoincrement())
   name         String
   email        String      @unique
   passwordHash String      @map("password_hash")
+  role         AdminRole   @default(VIEWER)
+  isActive     Boolean     @default(true) @map("is_active")
   broadcasts   Broadcast[]
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
