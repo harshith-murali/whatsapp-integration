@@ -258,25 +258,27 @@ export const BroadcastDetails: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400";
+        return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700";
       case "PENDING_APPROVAL":
-        return "bg-amber-50 text-amber-700 border-amber-250 dark:bg-amber-950/20 dark:text-amber-400";
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/60";
       case "APPROVED":
-        return "bg-indigo-50 text-indigo-750 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400";
+        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/60";
+      case "REJECTED":
+        return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/60";
       case "QUEUED":
-        return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/20 dark:text-cyan-400";
+        return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-800/60";
       case "PROCESSING":
-        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 animate-pulse";
+        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/60 animate-pulse";
       case "COMPLETED":
-        return "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/20 dark:text-emerald-400";
+        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60";
       case "PARTIALLY_FAILED":
-        return "bg-orange-50 text-orange-700 border-orange-250 dark:bg-orange-950/20 dark:text-orange-400";
+        return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800/60";
       case "FAILED":
-        return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400";
+        return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/60";
       case "CANCELLED":
-        return "bg-slate-100 text-slate-650 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400";
+        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700";
       default:
-        return "bg-slate-50 text-slate-700 border-slate-200";
+        return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700";
     }
   };
 
