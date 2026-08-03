@@ -149,3 +149,23 @@ h1, h2, h3, h4, h5, h6, p, span, svg {
 .animate-border-trail {
   animation: border-trail 3.2s linear infinite;
 }
+
+/* Dark mode input focus & typing visibility fix */
+.dark input,
+.dark textarea,
+.dark select {
+  color: #ffffff;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  background-color: var(--color-tail-dark-bg, #1a2230) !important;
+  color: #ffffff !important;
+  border-color: #6366f1 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8;
+}

@@ -47,7 +47,7 @@ export const SelectMenu: React.FC<SelectMenuProps> = ({
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={disabled}
-        className={`flex h-[42px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-left text-sm font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-white focus:border-indigo-500 focus:bg-white focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300 ${className}`}
+        className={`flex h-[42px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-left text-sm font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-white focus:border-indigo-500 focus:bg-white focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-300 dark:hover:bg-tail-dark-card dark:focus:bg-tail-dark-bg ${className}`}
       >
         <span className="min-w-0 truncate">{selected?.label || placeholder}</span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />

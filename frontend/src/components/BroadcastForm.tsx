@@ -137,7 +137,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Scheduled Maintenance Alert"
-            className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+            className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white dark:focus:bg-tail-dark-bg"
           />
           <div className="flex justify-end text-[10px] text-slate-400 mt-1">
             {title.length}/100 characters
@@ -215,7 +215,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message here..."
-            className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+            className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white dark:focus:bg-tail-dark-bg"
           />
           <div className="flex justify-end text-[10px] text-slate-400 mt-1">
             {message.length}/2000 characters

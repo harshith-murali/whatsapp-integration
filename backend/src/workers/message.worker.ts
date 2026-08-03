@@ -1,20 +1,11 @@
 import "dotenv/config";
 import crypto from "crypto";
 import os from "os";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { PrismaClient, MessageStatus, BroadcastStatus, WorkerStatus, MessageAttemptResult, MessageStatusEventSource } from "../generated/prisma/client.js";
+import { prisma } from "../config/prisma.js";
+import { MessageStatus, BroadcastStatus, WorkerStatus, MessageAttemptResult, MessageStatusEventSource } from "../generated/prisma/client.js";
 import { MessageProviderFactory } from "../providers/provider-factory.js";
 import { MessageProviderError } from "../providers/message-provider.js";
 import { logger } from "../config/logger.js";
-
-// Initialize database adapter dinamically as required in Prisma 7
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  logger.error("DATABASE_URL environment variable is not set");
-  process.exit(1);
-}
-const adapter = new PrismaMariaDb(databaseUrl);
-const prisma = new PrismaClient({ adapter });
 
 // Validate Worker Configurations
 const WORKER_ID = process.env.WORKER_ID || `worker-${os.hostname()}-${process.pid}-${crypto.randomBytes(3).toString("hex")}`;

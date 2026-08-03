@@ -487,7 +487,7 @@ export const Broadcasts: React.FC = () => {
                 placeholder="Search campaigns..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white dark:focus:bg-tail-dark-bg"
               />
             </div>
             <div>
@@ -788,7 +788,7 @@ export const Broadcasts: React.FC = () => {
                     value={actionReason}
                     onChange={(e) => setActionReason(e.target.value)}
                     placeholder="Specify why this broadcast alert has been rejected..."
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white dark:focus:bg-tail-dark-bg"
                   />
                 </div>
               </div>
@@ -842,7 +842,7 @@ export const Broadcasts: React.FC = () => {
                     value={actionReason}
                     onChange={(e) => setActionReason(e.target.value)}
                     placeholder="Specify why this active or approved campaign is being cancelled..."
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white"
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-white dark:focus:bg-tail-dark-bg"
                   />
                 </div>
               </div>
