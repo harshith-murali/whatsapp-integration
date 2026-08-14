@@ -200,13 +200,26 @@ export const getAppConfig = () => {
   const jwtSecret = validateJwtSecret(nodeEnv);
   const corsAllowedOrigins = validateCorsOrigins(nodeEnv);
 
-  // In production, COOKIE_SECURE defaults to true and cannot be overridden to false
+  // In production COOKIE_SECURE defaults to true and cannot normally be turned
+  // off. ALLOW_INSECURE_COOKIES exists solely for an IP-only staging box that
+  // has no domain and therefore no TLS certificate; it must never be set on a
+  // deployment handling real subscriber data, because session cookies then
+  // travel in cleartext and can be stolen off the network.
+  const allowInsecureCookies = parseBoolean("ALLOW_INSECURE_COOKIES", false);
   const cookieSecureRaw = parseBoolean("COOKIE_SECURE", nodeEnv === "production");
-  const cookieSecure = nodeEnv === "production" ? true : cookieSecureRaw;
+  const cookieSecure =
+    nodeEnv === "production" ? (allowInsecureCookies ? cookieSecureRaw : true) : cookieSecureRaw;
 
-  if (nodeEnv === "production" && !cookieSecureRaw) {
+  if (nodeEnv === "production" && !cookieSecureRaw && !allowInsecureCookies) {
     console.warn(
       "[env] WARNING: COOKIE_SECURE=false was set but overridden to true in production."
+    );
+  }
+  if (nodeEnv === "production" && !cookieSecure) {
+    console.warn(
+      "[env] SECURITY WARNING: cookies are being sent without the Secure flag " +
+        "(ALLOW_INSECURE_COOKIES=true). Sessions are interceptable over plain HTTP. " +
+        "Use this only for a private staging host, never with real data."
     );
   }
 

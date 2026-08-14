@@ -1,7 +1,11 @@
 import axios from "axios";
 
+// Defaults to a same-origin relative path so a built image runs on any host
+// without rebuilding: in production the reverse proxy serves the API under
+// /api on the same origin. VITE_API_URL still overrides it for local dev,
+// where Vite (5173) and the API (3000) are on different ports.
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   withCredentials: true,
 });
 

@@ -1,0 +1,149 @@
+# Production compose for a single EC2 host.
+#
+# Differs from docker-compose.yml in ways that matter on a small instance:
+#   - restart policies so the stack survives reboots and crashes
+#   - a one-shot migrate service that must succeed before the app starts
+#   - memory limits sized for a 1GB t3.micro
+#   - Caddy terminating TLS instead of exposing the API directly
+#   - MySQL bound to the docker network only, never the host
+#
+# Usage:  docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-whatsapp_alerts}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backups:/backups
+    # Deliberately no `ports:` — only reachable from the compose network.
+    command:
+      - --innodb-buffer-pool-size=192M
+      - --max-connections=60
+    healthcheck:
+      # Must connect over TCP (-h 127.0.0.1), not the local socket. During init
+      # MySQL 8.4 serves the socket on port 0, then restarts on 3306 — a socket
+      # ping passes during that window and lets migrations run too early.
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-P",
+          "3306",
+          "--protocol=TCP",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 420M
+
+  # Runs to completion before the app services start, so a failed migration
+  # blocks the deploy instead of leaving the app running against a stale schema.
+  migrate:
+    build:
+      context: ./backend
+    restart: "no"
+    command: ["npx", "prisma", "migrate", "deploy"]
+    env_file:
+      - ./backend/.env.production
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    expose:
+      - "3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+
+  message-worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["node", "--experimental-specifier-resolution=node", "dist/workers/message.worker.js"]
+    env_file:
+      - ./backend/.env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  webhook-worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["node", "--experimental-specifier-resolution=node", "dist/workers/webhook.worker.js"]
+    env_file:
+      - ./backend/.env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - api
+
+  # Terminates TLS with automatic Let's Encrypt certificates and proxies to the
+  # API and frontend, so neither is exposed directly.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      # Caddy reads this at runtime via {$APP_DOMAIN}. Compose's --env-file only
+      # performs substitution in this file, so it must be passed through here.
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - frontend
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:

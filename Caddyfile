@@ -1,0 +1,33 @@
+# Caddy fetches and renews Let's Encrypt certificates automatically once
+# APP_DOMAIN is a real domain pointing at this host.
+#
+# APP_DOMAIN examples:
+#   alerts.example.com   -> automatic HTTPS (required for login; the app forces
+#                           COOKIE_SECURE=true in production)
+#   localhost            -> local validation with Caddy's internal CA
+#   :80                  -> plain HTTP, no TLS
+{$APP_DOMAIN:localhost} {
+	encode gzip
+
+	# API and Meta webhooks go to the backend.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Everything else is the single-page frontend.
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
