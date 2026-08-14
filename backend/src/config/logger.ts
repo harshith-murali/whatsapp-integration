@@ -2,11 +2,29 @@ import winston from "winston";
 import path from "path";
 import fs from "fs";
 
-// Ensure logs directory exists
 const LOGS_DIR = path.join(process.cwd(), process.env.LOG_DIRECTORY || "logs");
-if (!fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
-}
+
+/**
+ * File logging is opt-out via LOG_TO_FILE=false. In containers the filesystem is
+ * often read-only or owned by another user, and stdout is already collected by
+ * the platform (CloudWatch, Docker), so an unwritable directory must degrade to
+ * console-only rather than crash the process at import time.
+ */
+const fileLoggingRequested = process.env.LOG_TO_FILE !== "false";
+
+const logsDirReady = ((): boolean => {
+  if (!fileLoggingRequested) return false;
+  try {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+    fs.accessSync(LOGS_DIR, fs.constants.W_OK);
+    return true;
+  } catch {
+    console.warn(
+      `[logger] Log directory ${LOGS_DIR} is not writable; continuing with console logging only.`
+    );
+    return false;
+  }
+})();
 
 /**
  * Redacts middle digits of a phone number.
@@ -110,8 +128,8 @@ export const logger = winston.createLogger({
   ],
 });
 
-// Configure file transports in production
-if (isProduction) {
+// Configure file transports in production when the log directory is writable.
+if (isProduction && logsDirReady) {
   logger.add(
     new winston.transports.File({
       filename: path.join(LOGS_DIR, "errors.log"),

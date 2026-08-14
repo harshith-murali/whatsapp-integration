@@ -1,0 +1,25 @@
+# The compose build context is ./backend, so the repository-root .dockerignore
+# does not apply here. Without this file, secrets and test fixtures would be
+# sent to the Docker daemon as build context.
+.env
+.env.*
+!.env.example
+
+node_modules
+dist
+logs
+coverage
+
+.git
+.gitignore
+
+# Tests never run inside the image; they also carry fixture credentials.
+src/**/*.test.ts
+src/e2e
+vitest.config.ts
+vitest.e2e.config.ts
+tsconfig.test.json
+
+.claude
+.agents
+.windsurf

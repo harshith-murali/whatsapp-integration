@@ -131,7 +131,10 @@ export const Subscribers: React.FC = () => {
     { value: "false", label: "Opted Out" },
   ];
 
-  const CountryCodePicker = () => (
+  // Rendered as a plain function call rather than a nested component. Defining a
+  // component during render gives it a new identity each time, which remounts
+  // the dropdown on every keystroke in the surrounding form.
+  const renderCountryCodePicker = () => (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex h-[42px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-white focus:border-indigo-500 focus:bg-white focus:outline-hidden dark:border-tail-dark-border dark:bg-tail-dark-bg dark:text-slate-200">
         <span className="flex min-w-0 items-center gap-2">
@@ -162,15 +165,8 @@ export const Subscribers: React.FC = () => {
     </DropdownMenu>
   );
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("add") === "true" && canCreate) {
-      // Clear the query parameter so modal doesn't re-open on state update
-      window.history.replaceState({}, document.title, window.location.pathname);
-      openCreateModal();
-    }
-  }, [location.search, canCreate]);
-
+  // Declared before the effect below, which calls it. As a `const` arrow it is
+  // not hoisted, so declaring it afterwards left it in the temporal dead zone.
   const openCreateModal = () => {
     setSubName("");
     setSubCountryCode("+91");
@@ -180,6 +176,15 @@ export const Subscribers: React.FC = () => {
     setFormError(null);
     setCreateModalOpen(true);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("add") === "true" && canCreate) {
+      // Clear the query parameter so modal doesn't re-open on state update
+      window.history.replaceState({}, document.title, window.location.pathname);
+      openCreateModal();
+    }
+  }, [location.search, canCreate]);
 
   const handleCreateSubscriber = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,7 +539,7 @@ export const Subscribers: React.FC = () => {
                     Phone Number (Required)
                   </label>
                   <div className="grid grid-cols-[156px_minmax(0,1fr)] gap-2">
-                    <CountryCodePicker />
+                    {renderCountryCodePicker()}
                     <input
                       type="tel"
                       required
@@ -641,7 +646,7 @@ export const Subscribers: React.FC = () => {
                     Phone Number (Required)
                   </label>
                   <div className="grid grid-cols-[156px_minmax(0,1fr)] gap-2">
-                    <CountryCodePicker />
+                    {renderCountryCodePicker()}
                     <input
                       type="tel"
                       required

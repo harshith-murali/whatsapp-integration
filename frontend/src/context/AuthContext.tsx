@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setAdmin(null);
       }
-    } catch (error) {
+    } catch {
       setAdmin(null);
     } finally {
       setLoading(false);
@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     try {
       await api.post("/auth/logout");
-    } catch (e) {
+    } catch {
       // Ignore network errors on logout
     } finally {
       setAdmin(null);
