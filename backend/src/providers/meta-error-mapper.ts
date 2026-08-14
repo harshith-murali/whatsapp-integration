@@ -15,8 +15,8 @@ export const mapMetaError = (args: {
   const providerSubcode = error.error_subcode !== undefined ? String(error.error_subcode) : undefined;
   const providerType = error.type !== undefined ? String(error.type) : undefined;
   const detail = typeof error.error_data?.details === "string" ? error.error_data.details : undefined;
-  const baseMessage = error.message || (args.cause instanceof Error ? args.cause.message : undefined);
-  const message = sanitize(detail ? `${baseMessage || "Meta API request failed"} - ${detail}` : baseMessage);
+  const baseMessage = error.message || (args.cause instanceof Error ? args.cause.message : undefined) || (args.status === 401 || args.status === 403 ? "Meta WhatsApp Access Token expired or lacks required permissions (HTTP 401/403)" : "Meta API request failed");
+  const message = sanitize(detail ? `${baseMessage} - ${detail}` : baseMessage);
   const status = args.status;
 
   if (!status) {
