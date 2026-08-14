@@ -278,7 +278,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
         </div>
 
         <div className="text-[11px] text-slate-400 leading-normal bg-indigo-50/30 rounded-lg p-3 border border-indigo-100/50 dark:bg-indigo-950/10 dark:border-indigo-900/30">
-          <strong>Please note:</strong> This preview matches internal formatting. Real recipients will receive this content via the WhatsApp alert gateway exactly as drafted above.
+          <strong>Please note:</strong> Recipients who messaged you within the last 24 hours receive this text exactly as drafted. For everyone else, WhatsApp requires an approved template, so your message is delivered inside that template and line breaks are collapsed to single spaces.
         </div>
       </div>
     </div>

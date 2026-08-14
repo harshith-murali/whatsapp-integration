@@ -395,6 +395,7 @@ async function processMessage(message: any) {
       subscriberId: message.subscriberId,
       phoneNumber: message.phoneNumber,
       message: message.broadcast.message,
+      lastInboundMessageAt: message.subscriber?.lastInboundMessageAt ?? null,
       metadata: {
         templateSnapshot: message.broadcast.templateSnapshot,
         templateName: message.broadcast.templateName,

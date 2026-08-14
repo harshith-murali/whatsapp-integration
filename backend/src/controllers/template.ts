@@ -3,33 +3,18 @@ import { prisma } from "../config/prisma.js";
 import { getMetaConfig } from "../config/env.js";
 import { MessageTemplateStatus, Prisma } from "../generated/prisma/client.js";
 import { BadRequestError } from "../utils/errors.js";
+import {
+  extractBody,
+  extractFooter,
+  extractHeaderType,
+  extractParameterSchema,
+} from "../providers/template-components.js";
 
 const mapStatus = (status: string | undefined): MessageTemplateStatus => {
   const normalized = String(status || "UNKNOWN").toUpperCase();
   return Object.values(MessageTemplateStatus).includes(normalized as MessageTemplateStatus)
     ? (normalized as MessageTemplateStatus)
     : MessageTemplateStatus.UNKNOWN;
-};
-
-const extractBody = (components: any[]): string => {
-  const body = components.find((component) => component.type === "BODY");
-  return body?.text || "";
-};
-
-const extractFooter = (components: any[]): string | null => {
-  const footer = components.find((component) => component.type === "FOOTER");
-  return footer?.text || null;
-};
-
-const extractHeaderType = (components: any[]): string | null => {
-  const header = components.find((component) => component.type === "HEADER");
-  return header?.format || null;
-};
-
-const extractParameterSchema = (components: any[]) => {
-  const body = extractBody(components);
-  const matches = Array.from(body.matchAll(/\{\{(\d+)\}\}/g)).map((match) => `body_${match[1]}`);
-  return matches.length > 0 ? { body: matches } : null;
 };
 
 export const getTemplates = async (_req: Request, res: Response, next: NextFunction) => {

@@ -4,6 +4,12 @@ export type SendMessageInput = {
   subscriberId: number;
   phoneNumber: string;
   message: string;
+  /**
+   * Last time this subscriber messaged us. Drives the WhatsApp customer-service
+   * window: while it is open the custom message can be sent verbatim as free-form
+   * text, otherwise it must be carried by an approved template.
+   */
+  lastInboundMessageAt?: Date | null;
   metadata?: Record<string, unknown>;
 };
 

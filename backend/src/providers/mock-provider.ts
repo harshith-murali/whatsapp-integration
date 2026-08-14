@@ -38,6 +38,11 @@ export class MockWhatsAppProvider implements MessageProvider {
     };
     const maskedPhone = maskPhone(input.phoneNumber);
 
+    logger.info(`[MockProvider] Sending to ${maskedPhone}: "${(input.message || "").slice(0, 120)}"`, {
+      messageId: input.messageId,
+      broadcastId: input.broadcastId,
+    });
+
     // 1. Simulate processing delay
     const delay = Math.floor(Math.random() * (this.maxDelay - this.minDelay + 1)) + this.minDelay;
     await new Promise((resolve) => setTimeout(resolve, delay));

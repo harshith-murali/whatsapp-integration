@@ -2,6 +2,12 @@ import "dotenv/config";
 import { prisma } from "../config/prisma.js";
 import { getMetaConfig } from "../config/env.js";
 import { MessageTemplateStatus, Prisma } from "../generated/prisma/client.js";
+import {
+  extractBody,
+  extractFooter,
+  extractHeaderType,
+  extractParameterSchema,
+} from "../providers/template-components.js";
 
 const mapStatus = (status: string | undefined): MessageTemplateStatus => {
   const normalized = String(status || "UNKNOWN").toUpperCase();
@@ -25,33 +31,22 @@ const main = async () => {
   let synced = 0;
   for (const item of body.data || []) {
     const components = Array.isArray(item.components) ? item.components : [];
-    const bodyComponent = components.find((component: any) => component.type === "BODY");
-    const footerComponent = components.find((component: any) => component.type === "FOOTER");
-    const headerComponent = components.find((component: any) => component.type === "HEADER");
+    const fields = {
+      metaTemplateId: item.id,
+      category: item.category || null,
+      status: mapStatus(item.status),
+      headerType: extractHeaderType(components),
+      body: extractBody(components),
+      footer: extractFooter(components),
+      components: components as Prisma.InputJsonValue,
+      parameterSchema: extractParameterSchema(components) as Prisma.InputJsonValue,
+      lastSyncedAt: new Date(),
+    };
+
     await prisma.messageTemplate.upsert({
       where: { name_language: { name: item.name, language: item.language } },
-      update: {
-        metaTemplateId: item.id,
-        category: item.category || null,
-        status: mapStatus(item.status),
-        headerType: headerComponent?.format || null,
-        body: bodyComponent?.text || "",
-        footer: footerComponent?.text || null,
-        components: components as Prisma.InputJsonValue,
-        lastSyncedAt: new Date(),
-      },
-      create: {
-        metaTemplateId: item.id,
-        name: item.name,
-        language: item.language,
-        category: item.category || null,
-        status: mapStatus(item.status),
-        headerType: headerComponent?.format || null,
-        body: bodyComponent?.text || "",
-        footer: footerComponent?.text || null,
-        components: components as Prisma.InputJsonValue,
-        lastSyncedAt: new Date(),
-      },
+      update: fields,
+      create: { ...fields, name: item.name, language: item.language },
     });
     synced++;
   }
