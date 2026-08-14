@@ -11,5 +11,13 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // Tests are run by vitest from source; keeping them out of the build means
+  // they are never shipped in the production image.
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/e2e/**",
+    "vitest.config.ts",
+    "vitest.e2e.config.ts"
+  ]
 }

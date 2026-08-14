@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Test files live alongside source but are not emitted, so the build's
+    // rootDir constraint does not apply here.
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.e2e.config.ts"],
+  "exclude": []
+}

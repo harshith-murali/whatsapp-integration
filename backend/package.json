@@ -26,7 +26,12 @@
     "cleanup:webhooks": "tsx src/scripts/cleanup.ts --target=webhooks",
     "cleanup:workers": "tsx src/scripts/cleanup.ts --target=workers",
     "cleanup:attempts": "tsx src/scripts/cleanup.ts --target=attempts",
-    "cleanup:all": "tsx src/scripts/cleanup.ts --target=all"
+    "cleanup:all": "tsx src/scripts/cleanup.ts --target=all",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "keywords": [],
   "author": "",
@@ -54,8 +59,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^26.1.2",
+    "@types/supertest": "^7.2.1",
     "prisma": "^7.9.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
