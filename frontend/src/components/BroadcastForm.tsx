@@ -9,6 +9,16 @@ interface GroupOption {
   name: string;
 }
 
+interface TemplateOption {
+  id: number;
+  name: string;
+  language: string;
+  category: string | null;
+  status: string;
+  body: string;
+  parameterSchema?: { body?: string[]; header?: string[] } | null;
+}
+
 interface BroadcastFormProps {
   initialValues?: {
     title: string;
@@ -17,6 +27,7 @@ interface BroadcastFormProps {
     severity: string;
     audienceType: string;
     groupId?: number | null;
+    messageTemplateId?: number | null;
   };
   onSubmit: (data: {
     title: string;
@@ -25,6 +36,7 @@ interface BroadcastFormProps {
     severity: string;
     audienceType: string;
     groupId: number | null;
+    messageTemplateId: number | null;
     submitImmediately: boolean;
   }) => void;
   loading: boolean;
@@ -42,6 +54,10 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
   const [audienceType, setAudienceType] = useState(initialValues?.audienceType || "ALL_ACTIVE_SUBSCRIBERS");
   const [groupId, setGroupId] = useState<number | "">(initialValues?.groupId || "");
   const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [messageTemplateId, setMessageTemplateId] = useState<number | "">(
+    initialValues?.messageTemplateId || ""
+  );
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const categoryOptions = [
     { value: "ANNOUNCEMENT", label: "Announcement" },
@@ -61,6 +77,24 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
     { value: "GROUP", label: "Group" },
   ];
 
+  // Only APPROVED templates can be queued, and only ones with a body variable
+  // can carry the message written above. Anything else would deliver the
+  // template's own fixed text instead.
+  const usableTemplates = templates.filter(
+    (template) =>
+      template.status === "APPROVED" && (template.parameterSchema?.body?.length || 0) > 0
+  );
+  const templateOptions = [
+    { value: "", label: "Use system default" },
+    ...usableTemplates.map((template) => ({
+      value: String(template.id),
+      label: `${template.name} (${template.language})${
+        template.category ? ` · ${template.category}` : ""
+      }`,
+    })),
+  ];
+  const selectedTemplate = templates.find((template) => template.id === messageTemplateId);
+
   useEffect(() => {
     const fetchGroups = async () => {
       try {
@@ -73,6 +107,20 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
       }
     };
     fetchGroups();
+  }, []);
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await api.get("/templates");
+        if (response.data?.success) {
+          setTemplates(response.data.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load message templates", err);
+      }
+    };
+    fetchTemplates();
   }, []);
 
   const handleAction = (submitImmediately: boolean) => {
@@ -108,6 +156,7 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
       severity,
       audienceType,
       groupId: audienceType === "GROUP" ? Number(groupId) : null,
+      messageTemplateId: messageTemplateId === "" ? null : Number(messageTemplateId),
       submitImmediately,
     });
   };
@@ -203,6 +252,36 @@ export const BroadcastForm: React.FC<BroadcastFormProps> = ({
               label="Recipient group"
             />
           </div>
+        </div>
+
+        {/* WhatsApp template */}
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            WhatsApp Template
+          </label>
+          <SelectMenu
+            value={String(messageTemplateId)}
+            options={templateOptions}
+            onValueChange={(value) => setMessageTemplateId(value ? Number(value) : "")}
+            label="WhatsApp template"
+          />
+          {selectedTemplate ? (
+            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-tail-dark-border dark:bg-tail-dark-bg">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                Your message replaces {"{{1}}"} in this template
+                {selectedTemplate.category ? ` · ${selectedTemplate.category}` : ""}
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                {selectedTemplate.body}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Only approved templates with a variable slot are listed, since the
+              message below must have somewhere to go. Leave as default to use the
+              server-configured template.
+            </p>
+          )}
         </div>
 
         {/* Message body */}

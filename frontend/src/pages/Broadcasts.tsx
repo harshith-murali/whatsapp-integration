@@ -35,6 +35,7 @@ interface Broadcast {
   severity: string;
   audienceType: string;
   groupId: number | null;
+  messageTemplateId: number | null;
   status: string;
   totalRecipients: number;
   createdById: number;
@@ -432,6 +433,7 @@ export const Broadcasts: React.FC = () => {
             severity: editingBroadcast.severity,
             audienceType: editingBroadcast.audienceType,
             groupId: editingBroadcast.groupId,
+            messageTemplateId: editingBroadcast.messageTemplateId,
           }}
           onSubmit={handleFormSubmit}
           loading={actionLoading}

@@ -2,11 +2,32 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// The form loads groups on mount; stub the API so tests stay offline.
+// The form loads groups and templates on mount; stub the API so tests stay
+// offline and each endpoint returns its own shape.
 vi.mock("../api/index.js", () => ({
   api: {
-    get: vi.fn().mockResolvedValue({
-      data: { success: true, data: { groups: [{ id: 1, name: "Ops Team" }] } },
+    get: vi.fn((url: string) => {
+      if (url.startsWith("/templates")) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: [
+              {
+                id: 7,
+                name: "service_update",
+                language: "en",
+                category: "UTILITY",
+                status: "APPROVED",
+                body: "Update on your request:\n{{1}}\nReply STOP to opt out.",
+                parameterSchema: { body: ["body_1"] },
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({
+        data: { success: true, data: { groups: [{ id: 1, name: "Ops Team" }] } },
+      });
     }),
   },
 }));
@@ -87,6 +108,47 @@ describe("BroadcastForm message content", () => {
 
     expect(titleBox()).toHaveValue("Existing");
     expect(messageBox()).toHaveValue("existing body");
+  });
+});
+
+describe("BroadcastForm template selection", () => {
+  it("sends no template id when the system default is kept", async () => {
+    const { onSubmit, user } = setup();
+
+    await user.type(titleBox(), "Default template");
+    await user.type(messageBox(), "meeting in an hr");
+    await user.click(screen.getByRole("button", { name: /save draft/i }));
+
+    expect(onSubmit.mock.calls[0][0].messageTemplateId).toBeNull();
+  });
+
+  it("passes the chosen template id through to onSubmit", async () => {
+    const { onSubmit, user } = setup();
+
+    await user.type(titleBox(), "Chosen template");
+    await user.type(messageBox(), "meeting in an hr");
+    // The SelectMenu trigger shows the current selection's label.
+    await user.click(await screen.findByText("Use system default"));
+    await user.click(await screen.findByText(/service_update \(en\)/));
+    await user.click(screen.getByRole("button", { name: /save draft/i }));
+
+    expect(onSubmit.mock.calls[0][0].messageTemplateId).toBe(7);
+  });
+
+  it("preselects the template when editing an existing broadcast", async () => {
+    setup({
+      initialValues: {
+        title: "Existing",
+        message: "existing body",
+        category: "ANNOUNCEMENT",
+        severity: "LOW",
+        audienceType: "ALL_ACTIVE_SUBSCRIBERS",
+        messageTemplateId: 7,
+      },
+    });
+
+    // The body preview only renders once a template is selected.
+    expect(await screen.findByText(/Update on your request:/)).toBeInTheDocument();
   });
 });
 
