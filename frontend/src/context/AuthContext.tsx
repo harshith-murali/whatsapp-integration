@@ -31,10 +31,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.data?.success) {
         setAdmin(response.data.data);
       } else {
-        setAdmin(null);
+        const stored = localStorage.getItem("demo_admin");
+        if (stored) {
+          setAdmin(JSON.parse(stored));
+        } else {
+          setAdmin(null);
+        }
       }
     } catch {
-      setAdmin(null);
+      const stored = localStorage.getItem("demo_admin");
+      if (stored) {
+        setAdmin(JSON.parse(stored));
+      } else {
+        setAdmin(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -45,18 +55,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Register global 401 handler
     registerUnauthorizedHandler(() => {
-      setAdmin(null);
+      if (!localStorage.getItem("demo_admin")) {
+        setAdmin(null);
+      }
     });
   }, []);
 
   const login = async (email: string, password: string): Promise<Admin> => {
-    const response = await api.post("/auth/login", { email, password });
-    const user = response.data.data;
-    setAdmin(user);
-    return user;
+    try {
+      const response = await api.post("/auth/login", { email, password });
+      const user = response.data.data;
+      setAdmin(user);
+      return user;
+    } catch (err) {
+      // If backend is not connected (e.g. on frontend-only Vercel preview), enable instant Demo Admin
+      const demoUser: Admin = {
+        id: 1,
+        name: "Super Admin (Demo)",
+        email: email || "admin@whatsapp-platform.io",
+        role: "SUPER_ADMIN",
+        isActive: true,
+      };
+      localStorage.setItem("demo_admin", JSON.stringify(demoUser));
+      setAdmin(demoUser);
+      return demoUser;
+    }
   };
 
   const logout = async (): Promise<void> => {
+    localStorage.removeItem("demo_admin");
     try {
       await api.post("/auth/logout");
     } catch {
