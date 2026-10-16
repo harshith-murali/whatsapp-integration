@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci
 
 FROM deps AS build
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY prisma ./prisma
 COPY src ./src
 # `npm run build` runs scripts/fix-prisma-esm-imports.cjs after tsc, so the
