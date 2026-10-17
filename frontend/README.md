@@ -1,75 +1,61 @@
-# React + TypeScript + Vite
+# WhatsApp Broadcast Platform — Frontend Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Modern, responsive administrative dashboard for orchestrating and monitoring WhatsApp alert broadcasts, built with React 18, TypeScript, Vite, and custom Vanilla CSS.
 
-Currently, two official plugins are available:
+🔗 **Live Demo:** [whatsapp-integration-iota.vercel.app](https://whatsapp-integration-iota.vercel.app)  
+📦 **Parent Repository:** [github.com/harshith-murali/whatsapp-integration](https://github.com/harshith-murali/whatsapp-integration)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🛠️ Tech Stack & Architecture
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework**: React 18 (SPA)
+- **Tooling**: Vite (fast HMR and optimized production bundling)
+- **Language**: TypeScript (strict types)
+- **Styling**: TailAdmin-inspired design system with CSS custom properties (`index.css`), full light/dark mode support, responsive layouts, and zero heavy UI runtime overhead.
+- **Routing**: React Router (DOM) with protected role-gated routes.
+- **API Client**: Centralized fetch client handling JWT credential exchange and error propagation.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🖥️ Views & Capabilities
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. **Dashboard Overview**: Aggregated broadcast volume, delivery success rates, queue latency, and real-time activity stream.
+2. **Campaign Manager**: Multi-step wizard for creating broadcast drafts, selecting recipient groups, and previewing WhatsApp template formatting.
+3. **Queue & Message Monitor**: Filterable table showing message status (`QUEUED`, `CLAIMED`, `SUBMITTED`, `FAILED`), retry counters, and failure codes with one-click requeue for admins.
+4. **Subscriber Roster**: Contact management with automatic PII masking (e.g. `••••••1234`) when viewed by read-only viewers.
+5. **Worker Heartbeats**: Real-time worker monitoring dashboard displaying host IDs, active worker counts, processed batches, and liveness status.
+6. **Audit Logs**: Immutable activity log recording all user logins, campaign approvals, and configuration changes.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Getting Started
 
+### 1. Install Dependencies
+```bash
+cd frontend
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+### 2. Configure Environment
+Create `.env` in `frontend/`:
+```env
+VITE_API_URL=http://localhost:3000/api
 ```
+
+### 3. Run Development Server
+```bash
+npm run dev
+# Running at http://localhost:5173
+```
+
+### 4. Build for Production
+```bash
+npm run build
+npm run preview
+```
+
+---
+
+## 📄 License
+MIT License. Part of WhatsApp Alert & Broadcast Platform.

@@ -1,22 +1,37 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" />
+  <img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Prisma_ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white" />
+</p>
+
 # WhatsApp Alert & Broadcast Platform
 
-A robust, role-aware internal notification system designed to orchestrate, approve, queue, and deliver WhatsApp broadcast campaigns. Built with a secure role-based access control (RBAC) model, transactional message claiming locks, background worker processes, and Winston structured log streams.
+> A robust, role-aware internal notification system designed to orchestrate, approve, queue, and deliver WhatsApp broadcast campaigns at scale. Features strict Role-Based Access Control (RBAC), atomic transactional message claiming locks, background daemon workers with exponential backoff retries, and Winston structured log streams.
+
+🔗 **Live Demo:** [whatsapp-integration-iota.vercel.app](https://whatsapp-integration-iota.vercel.app)  
+📦 **Repository:** [github.com/harshith-murali/whatsapp-integration](https://github.com/harshith-murali/whatsapp-integration)
 
 ---
 
-## 🚀 Tech Stack
+## 🛠️ Tech Stack
 
-- **Frontend**: React + TypeScript + Vite + Vanilla CSS (TailAdmin-inspired design system with dark mode)
-- **Backend**: Node.js + Express + TypeScript
-- **Database**: MySQL (MariaDB compatible)
-- **ORM**: Prisma ORM (Version 7 with dynamic runtime adapter resolution)
-- **Authentication**: JWT stored in secure `HttpOnly` cookies
-- **Worker Engine**: Node.js background process utilizing MySQL atomic transactional claim locks
-- **Logging**: Winston (structured worker and app logs) + Morgan (HTTP request logging with request correlation IDs)
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 18, TypeScript, Vite, Vanilla CSS (TailAdmin-inspired design system with dark/light themes) |
+| **Backend API** | Node.js, Express.js, TypeScript |
+| **Database** | MySQL 8.0+ / MariaDB |
+| **ORM** | Prisma ORM (v7 with dynamic runtime adapter resolution) |
+| **Authentication** | JWT stored in secure `HttpOnly` cookies |
+| **Worker Engine** | Node.js background process utilizing MySQL atomic transactional claim locks |
+| **Logging** | Winston (structured JSON worker/app logs) + Morgan (HTTP request correlation) |
 
 ---
 
-## 🔒 Role Philosophy & Permissions
+## 🔒 Role Philosophy & Permissions (RBAC)
 
 The platform enforces strict role-based visibility and least-privilege principles:
 
@@ -32,7 +47,7 @@ The platform enforces strict role-based visibility and least-privilege principle
 | **Manage Group Members** | ✓ | ✓ | ✓ | ✗ |
 | **Create Broadcast Drafts** | ✓ | ✓ | ✓ | ✗ |
 | **View Subscribers & Details** | ✓ | ✓ | ✓ | ✓ |
-| **View Dashboard** | Full | Campaign & Delivery | Workspace & Drafts | Subscriber Counts Only |
+| **View Dashboard** | Full Overview | Campaign & Delivery | Workspace & Drafts | Subscriber Counts Only |
 | **PII Protection (Phone Masking)** | Unmasked | Unmasked | Unmasked | Masked (`••••••1234`) |
 | **Sidebar Navigation Access** | All Items | All Items | All except Admins | Dashboard & Subscribers |
 
@@ -40,42 +55,48 @@ The platform enforces strict role-based visibility and least-privilege principle
 
 ## ⚡ Background Worker Queue Engine
 
-The messaging engine is handled by a separate worker process (`message.worker.ts`) executing as a background daemon:
+The messaging engine is handled by a decoupled worker daemon (`message.worker.ts`):
 
-1. **Transactional Claim Lock**: To prevent duplicate processing by concurrent worker scaling, the worker selects eligible `QUEUED` messages and stamps them atomically inside a transactional block using a unique `claimToken` and `workerId` with a TTL expiration date.
+1. **Transactional Claim Lock**: To prevent race conditions and duplicate deliveries across multiple worker instances, the worker claims eligible `QUEUED` messages atomically inside a transactional block using a unique `claimToken` and `workerId` with a TTL expiration timestamp:
+   ```sql
+   UPDATE Message 
+   SET claimToken = :uuid, workerId = :workerId, claimExpiresAt = :ttl
+   WHERE status = 'QUEUED' AND (claimExpiresAt IS NULL OR claimExpiresAt < NOW())
+   LIMIT :batchSize;
+   ```
 2. **Backoff Retry Policy**:
-   - **Attempt 1**: Retries after 30 seconds (`RETRY_DELAY_ATTEMPT_1_MS`).
-   - **Attempt 2**: Retries after 2 minutes (`RETRY_DELAY_ATTEMPT_2_MS`).
-   - **Attempt 3**: Retries after 10 minutes (`RETRY_DELAY_ATTEMPT_3_MS`).
-   - **Attempt 4**: Marks message permanently `FAILED` with code `RETRIES_EXHAUSTED`.
-3. **Stale Claim Recovery**: Expired worker claims (e.g. following worker crashes) are periodically scanned and returned to `QUEUED` state.
-4. **Graceful Shutdown**: Listens to `SIGINT`/`SIGTERM` interrupts to halt polling, wait for in-flight requests, write stopped heartbeat statuses, and disconnect cleanly.
-5. **Worker Monitor Heartbeats**: Registered workers log runtime stats (success count, failure count, host, PID) periodically, which are queried at `GET /api/workers` for Admin panels.
+   - **Attempt 1**: Retries after 30 seconds (`RETRY_DELAY_ATTEMPT_1_MS`)
+   - **Attempt 2**: Retries after 2 minutes (`RETRY_DELAY_ATTEMPT_2_MS`)
+   - **Attempt 3**: Retries after 10 minutes (`RETRY_DELAY_ATTEMPT_3_MS`)
+   - **Attempt 4**: Transitions to permanently `FAILED` with code `RETRIES_EXHAUSTED`
+3. **Stale Claim Recovery**: Expired worker claims (e.g. from crashed containers) are scanned and returned to `QUEUED` state.
+4. **Graceful Shutdown**: Traps `SIGINT`/`SIGTERM` interrupts to halt polling, complete in-flight batches, log terminal heartbeats, and disconnect cleanly.
+5. **Worker Monitor Heartbeats**: Registered workers report periodic runtime stats (success count, failure count, host PID) to the `WorkerHeartbeat` table, queried by admins at `/api/workers`.
 
 ---
 
-## 🧪 Development Mock Testing Mode
+## 🧪 Deterministic Mock Provider Testing
 
-The mock messaging provider matches phone numbers ending in specific suffixes to test delivery states deterministically in development/test environments:
+The mock messaging provider deterministically matches phone numbers ending in specific suffixes to test delivery lifecycles:
 
-- **Phone ending in `0001`**: Simulates instant **SUCCESS** (transitions to `SUBMITTED` with a generated provider ID).
+- **Phone ending in `0001`**: Simulates instant **SUCCESS** (transitions to `SUBMITTED` with a generated provider message ID).
 - **Phone ending in `0002`**: Simulates **RETRYABLE FAILURE** (throws `MOCK_RATE_LIMIT`, triggers backoff queue).
-- **Phone ending in `0003`**: Simulates **PERMANENT FAILURE** (throws `MOCK_INVALID_NUMBER`, transitions immediately to `FAILED`).
+- **Phone ending in `0003`**: Simulates **PERMANENT FAILURE** (throws `MOCK_INVALID_NUMBER`, transitions directly to `FAILED`).
 
 ---
 
-## ⚙️ Environment Variables
+## ⚙️ Environment Configuration
 
-Configure `.env` in the `backend` folder:
+Configure `.env` in the `backend/` directory:
 
 ```ini
 PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL="mysql://root:password@localhost:3306/whatsapp_alerts"
-JWT_SECRET="your_jwt_signing_secret_here"
+JWT_SECRET="your_secure_jwt_signing_secret"
 
-# Background Worker & Mock Provider Settings (Phase 3)
+# Background Worker & Provider Settings
 MESSAGE_PROVIDER=mock
 WORKER_POLL_INTERVAL_MS=2000
 WORKER_BATCH_SIZE=20
@@ -99,41 +120,48 @@ RETRY_DELAY_ATTEMPT_3_MS=600000
 ## 🛠️ Startup Instructions
 
 ### 1. Database Setup
-Ensure your MySQL server is running and run Prisma migrations:
+Ensure MySQL is running, then run Prisma migrations and seed default data:
 ```bash
 cd backend
+npm install
 npx prisma migrate dev
 npm run seed
 ```
 
 ### 2. Run Backend API Server
-Launch the Express server in a terminal window:
 ```bash
 cd backend
 npm run dev
+# API running at http://localhost:3000
 ```
 
 ### 3. Run Background Queue Worker
-Launch the background queue processor in a second terminal window:
+In a separate terminal:
 ```bash
 cd backend
 npm run worker:dev
 ```
 
-### 4. Run Frontend UI App
-Launch the Vite development application:
+### 4. Run Frontend Application
 ```bash
 cd frontend
+npm install
 npm run dev
+# Frontend running at http://localhost:5173
 ```
 
 ---
 
-## 📋 Credentials for Testing
+## 📋 Seeded Test Accounts
 
-Use the following seeded accounts for local login verification:
+| Role | Email | Password |
+|---|---|---|
+| **Super Admin** | `superadmin@alerts.com` | `SuperAdmin@123` |
+| **Admin** | `admin@alerts.com` | `Admin@123` |
+| **Operator** | `operator@alerts.com` | `Operator@123` |
+| **Viewer** | `viewer@alerts.com` | `Viewer@123` |
 
-- **Super Admin**: `superadmin@alerts.com` / `SuperAdmin@123`
-- **Admin**: `admin@alerts.com` / `Admin@123`
-- **Operator**: `operator@alerts.com` / `Operator@123`
-- **Viewer**: `viewer@alerts.com` / `Viewer@123`
+---
+
+## 📄 License
+MIT License. Built for WhatsApp Alert & Broadcast Platform.
